@@ -183,7 +183,10 @@
     <p><b>Total:</b> <span id="carritoTotal">$0.00</span></p>
 
     <h3>Datos del Cliente</h3>
-    <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required>
+    <div style="display: flex; gap: 10px; align-items: center;">
+  <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required style="flex: 0.5;">
+  <button id="btnConsultarPedidos" style="padding: 10px 15px; background:#3498db; color:white; border:none; border-radius:6px; cursor:pointer;">Consultar pedidos enviados</button>
+</div>
     <select id="clienteLocalidad" required>
       <option value="">Seleccionar localidad...</option>
     </select>
@@ -229,6 +232,35 @@
     <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" 
          alt="WhatsApp" style="width:60px; height:60px;">
   </a>
+
+
+<!-- Modal de pedidos existentes -->
+<div id="modalPedidosExistentes" style="
+    display:none;
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background: rgba(0,0,0,0.5);
+    justify-content:center;
+    align-items:center;
+    z-index:2000;
+">
+  <div style="
+      background:white;
+      padding:20px;
+      border-radius:10px;
+      max-width:500px;
+      width:90%;
+      text-align:center;
+      box-shadow:0 4px 12px rgba(0,0,0,0.3);
+  ">
+    <h3>Pedidos encontrados</h3>
+    <div id="listaPedidosExistentes" style="margin:15px 0; max-height:300px; overflow-y:auto;"></div>
+    <button onclick="cerrarModalPedidosExistentes()" style="margin-top:10px; padding:10px 15px; border:none; border-radius:6px; background:#e74c3c; color:white; cursor:pointer;">Cancelar</button>
+  </div>
+</div>
+
+
 
   <!-- Modal de confirmación PDF -->
   <div id="modalPDF" style="
@@ -291,6 +323,8 @@
     let carritoCliente = [];
     let todasLasPromos = [];
     let pedidoTemp = [];
+let pedidoActualId = null; // ID del pedido que se está editando
+
 
     // ================== CARGA CATEGORÍAS ==================
     async function cargarCategorias() {
@@ -340,7 +374,66 @@
       renderPromos(promos);
     }
 
-    // ================== FILTRAR POR NOMBRE ==================
+    
+
+// Abrir modal de pedidos existentes
+document.getElementById("btnConsultarPedidos").addEventListener("click", async () => {
+  const nombre = document.getElementById("clienteNombre").value.trim();
+  if (!nombre) {
+    alert("Ingrese un nombre para consultar pedidos.");
+    return;
+  }
+
+  const { data: pedidos, error } = await supabase
+    .from("pedidos")
+    .select("*")
+    .ilike("cliente", `%${nombre}%`)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error buscando pedidos:", error);
+    alert("Error al consultar pedidos.");
+    return;
+  }
+
+  const listaDiv = document.getElementById("listaPedidosExistentes");
+  listaDiv.innerHTML = "";
+
+  if (!pedidos || pedidos.length === 0) {
+    listaDiv.innerHTML = `<p>No se encontraron pedidos previos para <b>${nombre}</b>.</p>
+                          <button onclick="cerrarModalPedidosExistentes()" style="margin-top:10px; padding:10px 15px; border:none; border-radius:6px; background:#3498db; color:white; cursor:pointer;">Crear nuevo pedido</button>`;
+  } else {
+    pedidos.forEach(pedido => {
+      const fecha = new Date(pedido.created_at).toLocaleString("es-AR");
+      const btn = document.createElement("button");
+      btn.textContent = `Pedido del ${fecha} - Total: $${pedido.total.toFixed(2)}`;
+      btn.style.cssText = "display:block; width:100%; margin:5px 0; padding:8px; border:none; border-radius:6px; background:#27ae60; color:white; cursor:pointer;";
+      btn.onclick = () => {
+  // Cargar pedido al carrito
+  carritoCliente = pedido.productos;
+  renderCarrito();
+  document.getElementById("clienteLocalidad").value = pedido.localidad_id;
+  
+  // Guardamos el ID del pedido para actualizarlo luego
+  pedidoActualId = pedido.id;
+
+  cerrarModalPedidosExistentes();
+};
+      listaDiv.appendChild(btn);
+    });
+  }
+
+  document.getElementById("modalPedidosExistentes").style.display = "flex";
+});
+
+// Cerrar modal
+function cerrarModalPedidosExistentes() {
+  document.getElementById("modalPedidosExistentes").style.display = "none";
+}
+
+
+
+// ================== FILTRAR POR NOMBRE ==================
     document.getElementById("busquedaPromo").addEventListener("input", async (e) => {
       const texto = e.target.value.trim().toLowerCase();
       const catId = document.getElementById("categoriaSelect").value;
@@ -448,50 +541,73 @@
 
     // ================== PEDIDO ==================
     async function confirmarPedido() {
-      const nombre = document.getElementById("clienteNombre").value.trim();
-      const localidad = document.getElementById("clienteLocalidad").value;
+  const nombre = document.getElementById("clienteNombre").value.trim();
+  const localidad = document.getElementById("clienteLocalidad").value;
 
-      if (!nombre || !localidad || carritoCliente.length === 0) {
-        alert("Complete los datos y agregue al menos un producto.");
-        return;
-      }
+  if (!nombre || !localidad || carritoCliente.length === 0) {
+    alert("Complete los datos y agregue al menos un producto.");
+    return;
+  }
 
-      const total = carritoCliente.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
+  const total = carritoCliente.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
 
-      const pedido = {
-        cliente: nombre,
-        localidad_id: localidad,
-        productos: carritoCliente,
-        total: total,
-        created_at: new Date().toISOString(),
-        estado: "pendiente"
-      };
+  const pedido = {
+    cliente: nombre,
+    localidad_id: localidad,
+    productos: carritoCliente,
+    total: total,
+    created_at: new Date().toISOString(),
+    estado: "pendiente"
+  };
 
-      const { error } = await supabase.from("pedidos").insert(pedido);
-      if (error) {
-        alert("Error al enviar el pedido: " + error.message);
-        console.error(error);
-      } else {
-        pedidoTemp = [...carritoCliente];
-        abrirModalPDF();
-      }
-    }
+  let error;
+  if (pedidoActualId) {
+    // Actualizamos pedido existente
+    ({ error } = await supabase
+      .from("pedidos")
+      .update(pedido)
+      .eq("id", pedidoActualId));
+  } else {
+    // Creamos nuevo pedido
+    ({ error } = await supabase
+      .from("pedidos")
+      .insert(pedido));
+  }
+
+  if (error) {
+    alert("Error al enviar el pedido: " + error.message);
+    console.error(error);
+  } else {
+    pedidoTemp = [...carritoCliente]; // Para PDF
+    abrirModalPDF();
+
+    // Reseteamos ID si era nuevo
+    if (!pedidoActualId) pedidoActualId = null;
+  }
+}
+
 
     function abrirModalPDF() {
       document.getElementById("modalPDF").style.display = "flex";
     }
 
     function cerrarModalPDF() {
-      document.getElementById("modalPDF").style.display = "none";
-      alert("✅ Su pedido se envió correctamente.");
-      document.getElementById("clienteNombre").value = "";
-      document.getElementById("clienteLocalidad").value = "";
-      document.getElementById("categoriaSelect").value = "";
-      document.getElementById("productosContainer").innerHTML = "";
-      document.getElementById("busquedaPromo").value = "";
-      carritoCliente = [];
-      renderCarrito();
-    }
+  document.getElementById("modalPDF").style.display = "none";
+  alert("✅ Su pedido se envió correctamente.");
+  
+  // Limpiar inputs y carrito
+  document.getElementById("clienteNombre").value = "";
+  document.getElementById("clienteLocalidad").value = "";
+  document.getElementById("categoriaSelect").value = "";
+  document.getElementById("productosContainer").innerHTML = "";
+  document.getElementById("busquedaPromo").value = "";
+  carritoCliente = [];
+  renderCarrito();
+
+  // Reiniciamos pedido actual
+  pedidoActualId = null;
+  pedidoTemp = [];
+}
 
     async function descargarPDF() {
       const { jsPDF } = window.jspdf;
