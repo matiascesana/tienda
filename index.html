@@ -227,12 +227,12 @@
   }
 
   #modalPDF .modal-content button:nth-child(2) {
-    background:#27ae60;
+    background:#e74c3c;
     color:white;
   }
 
   #modalPDF .modal-content button:nth-child(3) {
-    background:#e74c3c;
+    background:#27ae60;
     color:white;
   }
 
@@ -240,8 +240,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.umd.min.js"></script>
-</head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
 
 <body>
 <header>
@@ -472,38 +472,104 @@ function cerrarModalPDF() {
   pedidoTemp = [];
 }
 
+// ================== DESCARGAR PDF CORREGIDO ==================
 async function descargarPDF() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const logoUrl = "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
-  const img = new Image();
-  img.src = logoUrl;
-  img.onload = ()=>{
-    doc.addImage(img,'PNG',10,10,70,40); // ancho mayor
-    doc.setFontSize(18);
-    doc.text("Pedido de Cliente", 150,25,{align:'right'});
+  // Copia profunda de los productos para evitar referencias
+  const productosPDF = JSON.parse(JSON.stringify(pedidoTemp));
+  if (!productosPDF || productosPDF.length === 0) {
+    alert("No hay productos para generar PDF.");
+    return;
+  }
+
+  // Verificar jsPDF
+  if (!window.jspdf) {
+  alert("Error: jsPDF no se cargó correctamente.");
+  return;
+}
+
+// Extraer jsPDF del módulo UMD
+const { jsPDF } = window.jspdf;
+const doc = new jsPDF();
+
+  // Datos del cliente
+  const nombreCliente = document.getElementById("clienteNombre").value.trim();
+  const locSelect = document.getElementById("clienteLocalidad");
+  const locText = locSelect.options[locSelect.selectedIndex]?.text || "";
+  const fecha = new Date().toLocaleString("es-AR");
+
+  // Función para generar el PDF
+  const generarDocumento = (logoCargado) => {
+    const margenX = 15;
+    let startY = 50;
+
+    // Agregar logo si se cargó
+    if (logoCargado) {
+      doc.addImage(imgLogo, 'PNG', margenX, 10, 100, 30);
+      startY = 60;
+    }
+
+    // Encabezado
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text("Distribuidora Allana", doc.internal.pageSize.getWidth() / 2, startY, { align: 'center' });
     doc.setFontSize(12);
-    const fecha=new Date().toLocaleString("es-AR");
-    doc.text(`Cliente: ${document.getElementById("clienteNombre").value}`,15,60);
-    const locSelect = document.getElementById("clienteLocalidad");
-    const locText = locSelect.options[locSelect.selectedIndex].text;
-    doc.text(`Localidad: ${locText}`,15,68);
-    doc.text(`Fecha: ${fecha}`,15,76);
-    const tabla = pedidoTemp.map(p=>[p.nombre,p.cantidad.toString(),`$${p.precio.toFixed(2)}`,`$${(p.precio*p.cantidad).toFixed(2)}`]);
-    if(typeof doc.autoTable==="function"){ 
-      doc.autoTable({ head:[['Producto','Cantidad','Precio','Subtotal']], body:tabla, startY:90, styles:{fontSize:11}, headStyles:{fillColor:[230,230,230]} });
-    } else if(window.jspdfAutoTable){ 
-      window.jspdfAutoTable(doc,{ head:[['Producto','Cantidad','Precio','Subtotal']], body:tabla, startY:90, styles:{fontSize:11}, headStyles:{fillColor:[230,230,230]} });
-    } else { alert("Error: jsPDF AutoTable no cargó correctamente."); return; }
-    const total = pedidoTemp.reduce((acc,p)=>acc+p.precio*p.cantidad,0);
-    const finalY = doc.lastAutoTable?doc.lastAutoTable.finalY:90;
-    doc.setFontSize(12);
-    doc.setFont(undefined,'bold');
-    doc.text(`TOTAL: $${total.toFixed(2)}`,150,finalY+10,{align:'right'});
+    doc.setFont(undefined, 'normal');
+    doc.text(`Pedido de Cliente`, doc.internal.pageSize.getWidth() / 2, startY + 8, { align: 'center' });
+    doc.text(`Fecha: ${fecha}`, margenX, startY + 18);
+    doc.text(`Cliente: ${nombreCliente}`, margenX, startY + 26);
+    doc.text(`Localidad: ${locText}`, margenX, startY + 34);
+
+    // Preparar tabla
+    const tabla = productosPDF.map(p => [
+      p.nombre,
+      p.cantidad.toString(),
+      `$${p.precio.toFixed(2)}`,
+      `$${(p.precio * p.cantidad).toFixed(2)}`
+    ]);
+
+    if (typeof doc.autoTable !== "function") {
+      alert("Error: jsPDF AutoTable no se cargó correctamente.");
+      doc.text("No se pudo generar la tabla de productos.", margenX, startY + 50);
+      doc.save("Pedido_basico.pdf");
+      cerrarModalPDF();
+      return;
+    }
+
+    doc.autoTable({
+      head: [['Producto','Cantidad','Precio','Subtotal']],
+      body: tabla,
+      startY: startY + 40,
+      styles: { fontSize: 11 },
+      headStyles: { fillColor: [230, 230, 230] },
+      margin: { left: margenX, right: margenX }
+    });
+
+    // Total
+    const total = productosPDF.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
+    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : startY + 40;
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: $${total.toFixed(2)}`, doc.internal.pageSize.getWidth() - margenX, finalY + 10, { align: 'right' });
+
+    // Guardar PDF
     doc.save("Pedido.pdf");
+
+    // Cerrar modal y limpiar
     cerrarModalPDF();
   };
+
+  // Cargar logo de forma asíncrona
+  const imgLogo = new Image();
+  imgLogo.crossOrigin = 'Anonymous';
+  imgLogo.src = "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
+
+  imgLogo.onload = () => generarDocumento(true);
+  imgLogo.onerror = () => {
+    console.warn("No se pudo cargar el logo, se generará PDF sin imagen.");
+    generarDocumento(false);
+  };
 }
+
+
 
 // ================== CONSULTAR PEDIDOS EXISTENTES ==================
 async function consultarPedidosCliente(){
