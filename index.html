@@ -31,7 +31,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    select {
+    select, input[type="text"] {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
@@ -154,14 +154,6 @@
       background: #0056b3;
     }
 
-    input {
-      width: 100%;
-      padding: 8px;
-      margin-top: 8px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-
     footer {
       text-align: center;
       padding: 15px;
@@ -177,27 +169,31 @@
   <header>🛍️ Tienda de Promociones</header>
 
   <main>
-    
-      <h3>🛒 Mi Pedido (<span id="carritoCount">0</span>)</h3>
-      <div id="carritoLista"><span style="color:#888;">No hay productos seleccionados</span></div>
-      <hr>
-      <p><b>Total:</b> <span id="carritoTotal">$0.00</span></p>
+    <h3>🛒 Mi Pedido (<span id="carritoCount">0</span>)</h3>
+    <div id="carritoLista"><span style="color:#888;">No hay productos seleccionados</span></div>
+    <hr>
+    <p><b>Total:</b> <span id="carritoTotal">$0.00</span></p>
 
-      <h3>Datos del Cliente</h3>
-      <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required>
-      <select id="clienteLocalidad" required>
-        <option value="">Seleccionar localidad...</option>
-      </select>
+    <h3>Datos del Cliente</h3>
+    <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required>
+    <select id="clienteLocalidad" required>
+      <option value="">Seleccionar localidad...</option>
+    </select>
 
-      <button class="btn-confirmar" onclick="confirmarPedido()">Confirmar y Enviar Pedido</button>
-    </div>
-<h2>Seleccione una Categoría</h2>
+    <button class="btn-confirmar" onclick="confirmarPedido()">Confirmar y Enviar Pedido</button>
+    <hr>
+
+    <h2>Seleccione una Categoría</h2>
     <select id="categoriaSelect" onchange="cargarPromosPorCategoria()">
       <option value="">Seleccionar categoría...</option>
     </select>
-<div id="productosContainer" class="productos-container"></div>
 
-    <div id="carritoResumen">
+    <h3>Buscar Promoción</h3>
+    <input id="busquedaPromo" type="text" placeholder="Escriba el nombre de la promoción...">
+
+    <div id="productosContainer" class="productos-container"></div>
+
+    <div id="carritoResumen"></div>
   </main>
 
   <footer>Distribuidora Allana © 2025</footer>
@@ -208,6 +204,7 @@
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let carritoCliente = [];
+    let todasLasPromos = [];
 
     // ================== CARGA CATEGORÍAS ==================
     async function cargarCategorias() {
@@ -253,27 +250,68 @@
         return;
       }
 
-      if (!promos.length) {
-        cont.innerHTML = "<p>No hay productos en esta categoría.</p>";
-        return;
-      }
-
-      promos.forEach(p => {
-        const card = document.createElement("div");
-        card.className = "promo-card";
-        const imgURL = p.imagen
-          ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
-          : "";
-
-        card.innerHTML = `
-          <img src="${imgURL}" alt="${p.nombre}">
-          <h3>${p.nombre}</h3>
-          <p>$${Number(p.precio).toFixed(2)}</p>
-          <button onclick="agregarAlCarrito(${p.id}, '${p.nombre}', ${p.precio})">Agregar</button>
-        `;
-        cont.appendChild(card);
-      });
+      todasLasPromos = promos;
+      renderPromos(promos);
     }
+
+    // ================== FILTRAR POR NOMBRE ==================
+    document.getElementById("busquedaPromo").addEventListener("input", async (e) => {
+  const texto = e.target.value.trim().toLowerCase();
+  const catId = document.getElementById("categoriaSelect").value;
+  const cont = document.getElementById("productosContainer");
+
+  if (texto.length === 0 && !catId) {
+    cont.innerHTML = "<p style='color:#888;'>Seleccione una categoría o busque una promoción.</p>";
+    return;
+  }
+
+  let query = supabase.from("promociones").select("*");
+
+  if (catId) query = query.eq("categoria_id", catId);
+  if (texto.length > 0) query = query.ilike("nombre", `%${texto}%`);
+
+  const { data: promos, error } = await query;
+  if (error) {
+    cont.innerHTML = "<p style='color:red;'>Error al buscar promociones.</p>";
+    console.error(error);
+    return;
+  }
+
+  renderPromos(promos);
+});
+
+
+// ================== MOSTRAR PROMOCIONES ==================
+function renderPromos(promos) {
+  const cont = document.getElementById("productosContainer");
+  cont.innerHTML = "";
+
+  if (!promos || promos.length === 0) {
+    cont.innerHTML = "<p style='color:#888;'>No hay productos que coincidan.</p>";
+    return;
+  }
+
+  promos.forEach(p => {
+    // ✅ Corregimos la ruta de imagen
+    const imgURL = p.imagen
+      ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
+      : "https://via.placeholder.com/200x140?text=Sin+Imagen";
+
+    const card = document.createElement("div");
+    card.className = "promo-card";
+    card.innerHTML = `
+      <img src="${imgURL}" alt="${p.nombre}">
+      <h3>${p.nombre}</h3>
+      <p>$${p.precio.toFixed(2)}</p>
+      <button onclick="agregarAlCarrito(${p.id}, '${p.nombre}', ${p.precio})">Agregar</button>
+    `;
+    cont.appendChild(card);
+  });
+}
+
+
+
+
 
     // ================== CARRITO ==================
     function agregarAlCarrito(id, nombre, precio) {
@@ -329,22 +367,27 @@
     // ================== CONFIRMAR PEDIDO ==================
     async function confirmarPedido() {
       const nombre = document.getElementById("clienteNombre").value.trim();
-      const localidad = document.getElementById("clienteLocalidad").value.trim();
+      const localidad = document.getElementById("clienteLocalidad").value;
 
       if (!nombre || !localidad || carritoCliente.length === 0) {
         alert("Complete los datos y agregue al menos un producto.");
         return;
       }
 
+      // Calcular total
+      const total = carritoCliente.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
+
       const pedido = {
         cliente: nombre,
         localidad_id: localidad,
         productos: carritoCliente,
+        total: total,
         created_at: new Date().toISOString(),
         estado: "pendiente"
       };
 
-      const { error } = await supabase.from("pedidos").insert(pedido);
+      const { error } = await supabase.from("pedidos").insert([pedido]);
+
       if (error) {
         alert("Error al enviar el pedido: " + error.message);
         console.error(error);
@@ -354,6 +397,9 @@
         renderCarrito();
         document.getElementById("clienteNombre").value = "";
         document.getElementById("clienteLocalidad").value = "";
+        document.getElementById("categoriaSelect").value = "";
+        document.getElementById("productosContainer").innerHTML = "";
+        document.getElementById("busquedaPromo").value = "";
       }
     }
 
