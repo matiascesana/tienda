@@ -163,10 +163,18 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
 </head>
 
 <body>
-  <header>🛍️ Tienda de Promociones</header>
+  <header style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+    <img src="https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png" 
+         alt="Logo Distribuidora" 
+         style="height: 100px;">
+    🛍️ Tienda de Promociones de Distribuidora Allana
+  </header>
 
   <main>
     <h3>🛒 Mi Pedido (<span id="carritoCount">0</span>)</h3>
@@ -198,6 +206,83 @@
 
   <footer>Distribuidora Allana © 2025</footer>
 
+  <!-- Botón de WhatsApp -->
+  <a href="https://wa.me/5493854784659?text=Hola%20te%20escribo%20de%20tu%20página%20de%20pedidos" 
+     target="_blank" 
+     style="
+       position: fixed;
+       bottom: 20px;
+       right: 20px;
+       background-color: #25D366;
+       color: white;
+       border-radius: 50%;
+       width: 60px;
+       height: 60px;
+       display: flex;
+       justify-content: center;
+       align-items: center;
+       text-decoration: none;
+       font-size: 30px;
+       box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+       z-index: 1000;
+     ">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" 
+         alt="WhatsApp" style="width:60px; height:60px;">
+  </a>
+
+  <!-- Modal de confirmación PDF -->
+  <div id="modalPDF" style="
+      display:none;
+      position:fixed;
+      top:0; left:0;
+      width:100%; height:100%;
+      background: rgba(0,0,0,0.5);
+      justify-content:center;
+      align-items:center;
+      z-index:2000;
+  ">
+    <div style="
+    background:white;
+    padding:30px;
+    border-radius:15px;
+    max-width:450px;
+    width:90%;
+    text-align:center;
+    box-shadow:0 6px 18px rgba(0,0,0,0.3);
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+    align-items:center;
+">
+  <p style="font-size:18px;">✅ Pedido enviado correctamente.<br>¿Desea descargar el PDF con el detalle del pedido?</p>
+  <div style="display:flex; gap:20px; width:100%; justify-content:center;">
+    <button onclick="descargarPDF()" style="
+      flex:1;
+      padding:12px;
+      font-size:16px;
+      background:#27ae60;
+      color:white;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      transition:0.2s;
+    " onmouseover="this.style.background='#219150'" onmouseout="this.style.background='#27ae60'">Sí</button>
+
+    <button onclick="cerrarModalPDF()" style="
+      flex:1;
+      padding:12px;
+      font-size:16px;
+      background:#e74c3c;
+      color:white;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      transition:0.2s;
+    " onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='#e74c3c'">No</button>
+  </div>
+</div>
+
+
   <script>
     const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
@@ -205,6 +290,7 @@
 
     let carritoCliente = [];
     let todasLasPromos = [];
+    let pedidoTemp = [];
 
     // ================== CARGA CATEGORÍAS ==================
     async function cargarCategorias() {
@@ -256,62 +342,59 @@
 
     // ================== FILTRAR POR NOMBRE ==================
     document.getElementById("busquedaPromo").addEventListener("input", async (e) => {
-  const texto = e.target.value.trim().toLowerCase();
-  const catId = document.getElementById("categoriaSelect").value;
-  const cont = document.getElementById("productosContainer");
+      const texto = e.target.value.trim().toLowerCase();
+      const catId = document.getElementById("categoriaSelect").value;
+      const cont = document.getElementById("productosContainer");
 
-  if (texto.length === 0 && !catId) {
-    cont.innerHTML = "<p style='color:#888;'>Seleccione una categoría o busque una promoción.</p>";
-    return;
-  }
+      if (texto.length === 0 && !catId) {
+        cont.innerHTML = "<p style='color:#888;'>Seleccione una categoría o busque una promoción.</p>";
+        return;
+      }
 
-  let query = supabase.from("promociones").select("*");
+      let query = supabase.from("promociones").select("*");
 
-  if (catId) query = query.eq("categoria_id", catId);
-  if (texto.length > 0) query = query.ilike("nombre", `%${texto}%`);
+      if (catId) query = query.eq("categoria_id", catId);
+      if (texto.length > 0) query = query.ilike("nombre", `%${texto}%`);
 
-  const { data: promos, error } = await query;
-  if (error) {
-    cont.innerHTML = "<p style='color:red;'>Error al buscar promociones.</p>";
-    console.error(error);
-    return;
-  }
+      const { data: promos, error } = await query;
+      if (error) {
+        cont.innerHTML = "<p style='color:red;'>Error al buscar promociones.</p>";
+        console.error(error);
+        return;
+      }
 
-  renderPromos(promos);
-});
+      renderPromos(promos);
+    });
 
+    // ================== RENDER PROMOS ==================
+    function renderPromos(promos) {
+      const cont = document.getElementById("productosContainer");
+      cont.innerHTML = "";
 
-// ================== MOSTRAR PROMOCIONES ==================
-function renderPromos(promos) {
-  const cont = document.getElementById("productosContainer");
-  cont.innerHTML = "";
+      if (!promos || promos.length === 0) {
+        cont.innerHTML = "<p style='color:#888;'>No hay productos que coincidan.</p>";
+        return;
+      }
 
-  if (!promos || promos.length === 0) {
-    cont.innerHTML = "<p style='color:#888;'>No hay productos que coincidan.</p>";
-    return;
-  }
+      promos.forEach(p => {
+        const imgURL = p.imagen
+          ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
+          : "https://via.placeholder.com/200x140?text=Sin+Imagen";
 
-  promos.forEach(p => {
-    // ✅ Corregimos la ruta de imagen
-    const imgURL = p.imagen
-      ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
-      : "https://via.placeholder.com/200x140?text=Sin+Imagen";
+        const card = document.createElement("div");
+        card.className = "promo-card";
 
-    const card = document.createElement("div");
-    card.className = "promo-card";
-    card.innerHTML = `
-      <img src="${imgURL}" alt="${p.nombre}">
-      <h3>${p.nombre}</h3>
-      <p>$${p.precio.toFixed(2)}</p>
-      <button onclick="agregarAlCarrito(${p.id}, '${p.nombre}', ${p.precio})">Agregar</button>
-    `;
-    cont.appendChild(card);
-  });
-}
+        const nombreEscapado = p.nombre.replace(/'/g, "\\'");
+        card.innerHTML = `
+          <img src="${imgURL}" alt="${nombreEscapado}">
+          <h3>${p.nombre}</h3>
+          <p>$${p.precio.toFixed(2)}</p>
+          <button onclick="agregarAlCarrito(${p.id}, '${nombreEscapado}', ${p.precio})">Agregar</button>
+        `;
 
-
-
-
+        cont.appendChild(card);
+      });
+    }
 
     // ================== CARRITO ==================
     function agregarAlCarrito(id, nombre, precio) {
@@ -325,8 +408,7 @@ function renderPromos(promos) {
       const item = carritoCliente.find(i => i.id === id);
       if (!item) return;
       item.cantidad += delta;
-      if (item.cantidad <= 0)
-        carritoCliente = carritoCliente.filter(p => p.id !== id);
+      if (item.cantidad <= 0) carritoCliente = carritoCliente.filter(p => p.id !== id);
       renderCarrito();
     }
 
@@ -364,7 +446,7 @@ function renderPromos(promos) {
         lista.innerHTML = '<span style="color:#888;">No hay productos seleccionados</span>';
     }
 
-    // ================== CONFIRMAR PEDIDO ==================
+    // ================== PEDIDO ==================
     async function confirmarPedido() {
       const nombre = document.getElementById("clienteNombre").value.trim();
       const localidad = document.getElementById("clienteLocalidad").value;
@@ -374,7 +456,6 @@ function renderPromos(promos) {
         return;
       }
 
-      // Calcular total
       const total = carritoCliente.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
 
       const pedido = {
@@ -386,26 +467,88 @@ function renderPromos(promos) {
         estado: "pendiente"
       };
 
-      const { error } = await supabase.from("pedidos").insert([pedido]);
-
+      const { error } = await supabase.from("pedidos").insert(pedido);
       if (error) {
         alert("Error al enviar el pedido: " + error.message);
         console.error(error);
       } else {
-        alert("✅ Pedido enviado correctamente. ¡Gracias!");
-        carritoCliente = [];
-        renderCarrito();
-        document.getElementById("clienteNombre").value = "";
-        document.getElementById("clienteLocalidad").value = "";
-        document.getElementById("categoriaSelect").value = "";
-        document.getElementById("productosContainer").innerHTML = "";
-        document.getElementById("busquedaPromo").value = "";
+        pedidoTemp = [...carritoCliente];
+        abrirModalPDF();
       }
+    }
+
+    function abrirModalPDF() {
+      document.getElementById("modalPDF").style.display = "flex";
+    }
+
+    function cerrarModalPDF() {
+      document.getElementById("modalPDF").style.display = "none";
+      alert("✅ Su pedido se envió correctamente.");
+      document.getElementById("clienteNombre").value = "";
+      document.getElementById("clienteLocalidad").value = "";
+      document.getElementById("categoriaSelect").value = "";
+      document.getElementById("productosContainer").innerHTML = "";
+      document.getElementById("busquedaPromo").value = "";
+      carritoCliente = [];
+      renderCarrito();
+    }
+
+    async function descargarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Logo
+      const logoUrl = "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
+      const img = new Image();
+      img.src = logoUrl;
+
+      img.onload = () => {
+  const logoWidth = 60; // nuevo ancho más amplio
+  const logoHeight = (img.height / img.width) * logoWidth; // mantiene proporción
+  doc.addImage(img, 'PNG', 15, 10, logoWidth, logoHeight);
+  
+  doc.setFontSize(18);
+  doc.text("Pedido de Cliente", 150, 25, { align: 'right' });
+
+        const fecha = new Date().toLocaleString("es-AR");
+        doc.setFontSize(12);
+        doc.text(`Cliente: ${document.getElementById("clienteNombre").value}`, 15, 60);
+        const localidadSelect = document.getElementById("clienteLocalidad");
+        const localidadText = localidadSelect.options[localidadSelect.selectedIndex].text;
+        doc.text(`Localidad: ${localidadText}`, 15, 68);
+        doc.text(`Fecha: ${fecha}`, 15, 76);
+
+        const tabla = pedidoTemp.map(p => [
+          p.nombre,
+          p.cantidad.toString(),
+          `$${p.precio.toFixed(2)}`,
+          `$${(p.precio * p.cantidad).toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+          head: [['Producto', 'Cantidad', 'Precio', 'Subtotal']],
+          body: tabla,
+          startY: 90,
+          styles: { fontSize: 11 },
+          headStyles: { fillColor: [230, 230, 230] }
+        });
+
+        const total = pedidoTemp.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
+        const finalY = doc.lastAutoTable.finalY || 90;
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(`TOTAL: $${total.toFixed(2)}`, 150, finalY + 10, { align: 'right' });
+
+        doc.save("Pedido.pdf");
+        pedidoTemp = [];
+        cerrarModalPDF();
+      };
     }
 
     // ================== INICIALIZACIÓN ==================
     cargarCategorias();
     cargarLocalidades();
   </script>
+
 </body>
 </html>
