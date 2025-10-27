@@ -236,6 +236,25 @@
     color:white;
   }
 
+
+
+/* Estilo general del botón (opcional, por si querés definirlo) */
+#consultarPedidosCliente {
+  font-size: 16px;
+  padding: 10px 20px;
+}
+
+/* 🔹 Versión más pequeña solo en pantallas móviles */
+@media (max-width: 600px) {
+  #consultarPedidosCliente {
+    font-size: 13px;   /* texto más chico */
+    padding: 6px 12px; /* menos alto y ancho */
+  }
+}
+
+
+
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -551,7 +570,11 @@ const doc = new jsPDF();
     doc.text(`TOTAL: $${total.toFixed(2)}`, doc.internal.pageSize.getWidth() - margenX, finalY + 10, { align: 'right' });
 
     // Guardar PDF
-    doc.save("Pedido.pdf");
+  const fechaCorta = new Date().toLocaleDateString("es-AR").replaceAll('/', '-');
+const nombreArchivo = `Pedido_${nombreCliente.replace(/\s+/g, '_')}_${fechaCorta}.pdf`;
+doc.save(nombreArchivo);
+
+
 
     // Cerrar modal y limpiar
     cerrarModalPDF();
