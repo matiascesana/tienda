@@ -409,17 +409,30 @@ let pedidoExistenteId = null;
 
 // ================== CARGA CATEGORÍAS ==================
 async function cargarCategorias() {
-  const { data, error } = await supabase.from("categorias").select("*").order("id");
-  if (error) return console.error(error);
-  const select = document.getElementById("categoriaSelect");
-  select.innerHTML = '<option value="">Seleccionar categoría...</option>';
-  data.forEach(cat => {
-    const opt = document.createElement("option");
-    opt.value = cat.id;
-    opt.textContent = cat.nombre;
-    select.appendChild(opt);
-  });
+  // Usamos .order('nombre', { ascending: true }) para ordenar alfabéticamente
+  const { data, error } = await supabase
+    .from("categorias")
+    .select("*")
+    .order("nombre", { ascending: true }); // A-Z
+
+  if (error) {
+    // Si hay un error, lo registramos y salimos de la función
+    console.error("Error al cargar categorías:", error);
+    return; 
+  }
+  
+  // Si la consulta es exitosa, llenamos el desplegable
+  const select = document.getElementById("categoriaSelect");
+  select.innerHTML = '<option value="">Seleccionar categoría...</option>';
+  
+  data.forEach(cat => {
+    const opt = document.createElement("option");
+    opt.value = cat.id;
+    opt.textContent = cat.nombre;
+    select.appendChild(opt);
+  });
 }
+
 
 // ================== CARGA LOCALIDADES ==================
 async function cargarLocalidades() {
@@ -453,8 +466,23 @@ async function cargarPromosPorCategoria() {
   const cont = document.getElementById("productosContainer");
   cont.innerHTML = "";
   if (!catId) return;
-  const { data: promos, error } = await supabase.from("promociones").select("*").eq("categoria_id", catId);
-  if (error) { cont.innerHTML = "<p style='color:red;'>Error al cargar productos.</p>"; return; }
+
+  const { data: promos, error } = await supabase
+    .from("promociones")
+    .select("*")
+    .eq("categoria_id", catId);
+
+
+  if (error) {
+    cont.innerHTML = "<p style='color:red;'>Error al cargar productos.</p>";
+    return;
+  }
+
+  // 🔤 Ordenar alfabéticamente por nombre
+  promos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+
+
+
   todasLasPromos = promos;
   renderPromos(promos);
 }
@@ -920,11 +948,6 @@ window.addEventListener("DOMContentLoaded", () => {
   cargarCategorias();
   cargarLocalidades();
 });
-</script>
-</body>
-</html>
-
-
 </script>
 </body>
 </html>
