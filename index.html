@@ -126,6 +126,19 @@
     background: #1e8449;
   }
 
+
+    #consultarPedidosCliente {
+    background-color: #f39c12 !important; /* Color naranja */
+    color: white !important;
+    border: none !important;
+    transition: background-color 0.2s;
+  }
+  
+  #consultarPedidosCliente:hover {
+    background-color: #e67e22 !important; /* Naranja más oscuro al pasar el ratón */
+  }
+
+
   #carritoResumen {
     margin-top: 20px;
     background: #f9f9f9;
@@ -243,20 +256,20 @@
     color:white;
   }
 
-/* NUEVO Modal para la imagen ampliada (CSS AGREGADO O COMPLETADO AQUÍ) */
-  #modalImagen {
-    display: none; /* Oculto por defecto */
-    position: fixed;
-    z-index: 3000; /* Mayor que otros modales */
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto; /* Para scroll si la imagen es muy grande */
-    background-color: rgba(0,0,0,0.9); /* Fondo oscuro */
-    align-items: center;
-    justify-content: center;
-  }
+/* NUEVO Modal para la imagen ampliada */
+#modalImagen {
+  display: none; /* Oculto por defecto */
+  position: fixed !important; /* FORZAR POSICIONAMIENTO FIJO */
+  z-index: 99999 !important; /* FORZAR MÁXIMA PRIORIDAD */
+  left: 0 !important;
+  top: 0 !important;
+  width: 100%;
+  height: 100%;
+  overflow: auto; 
+  background-color: rgba(0,0,0,0.9); /* Fondo oscuro */
+  align-items: center;
+  justify-content: center;
+}
 
   #modalImagen .modal-content-img {
     position: relative;
@@ -319,6 +332,69 @@
 
 
 
+/* =================== NUEVOS ESTILOS PARA EL SELECTOR DE CANTIDAD EN LA TARJETA =================== */
+
+/* Contenedor Flex para los botones +/- y la cantidad */
+.quantity-controls-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 35px; /* Altura más pequeña */
+  max-width: 120px; /* Ancho máximo para que sea chico */
+  margin: 0 auto; /* Centrar los controles */
+}
+
+/* Estilo de los botones +/- */
+.btn-cantidad-menos, .btn-cantidad-mas {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 0;
+  width: 35px; /* Ancho fijo */
+  height: 100%;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  line-height: 1; /* Asegura el centrado vertical del texto */
+}
+
+/* Efecto hover */
+.btn-cantidad-menos:hover, .btn-cantidad-mas:hover {
+  background-color: #2980b9;
+}
+
+/* Estilo para el número de cantidad (el <span>) */
+.cantidad-display-card {
+  flex-grow: 1;
+  text-align: center;
+  font-weight: bold;
+  font-size: 16px;
+  color: #333;
+  padding: 0 5px;
+}
+
+/* Ajuste al botón general de Agregar */
+.add-to-cart-btn {
+  /* Reutiliza el estilo base del promo-card button */
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  padding: 10px; /* Un poco más pequeño */
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  width: 100%;
+  transition: 0.2s;
+}
+
+.add-to-cart-btn:hover {
+  background: #1e8449;
+}
+
 
 
 
@@ -344,11 +420,15 @@
   <p><b>Total:</b> <span id="carritoTotal">$0.00</span></p>
 
   <h3>Datos del Cliente</h3>
-  <div style="display:flex;gap:10px; flex-wrap:wrap;">
-    <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required style="flex:1;">
-<input id="dni" type="text" placeholder="DNI sin puntos">
+  <div style="display:flex;gap:10px; flex-wrap:wrap;">
+    <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required style="flex:1;">
+<button onclick="buscarClientePorNombre()" id="buscarClienteBtn" style="background:#f39c12; color:white; border:none; border-radius:8px; padding:12px 16px; margin-top:12px; cursor:pointer;">Buscar Cliente</button>
+ </div>
+
+  <div style="display:flex;gap:10px; flex-wrap:wrap;">
+    <input id="dni" type="text" placeholder="DNI sin puntos" style="flex:1;">
 <button onclick="consultarPedidosCliente()" id="consultarPedidosCliente">Consultar pedidos ya cargados</button>
- </div>
+ </div>
 
   <select id="clienteLocalidad" required>
     <option value="">Seleccionar localidad...</option>
@@ -383,10 +463,10 @@
 
 
 <div id="modalImagen">
-  <div class="modal-content-img">
+<button class="close-button" onclick="cerrarModalImagen()">Cerrar</button>
+  <div class="modal-content-img"></div>
     <img id="imagenModalAmpliada" src="" alt="Imagen Ampliada">
-    <button class="close-button" onclick="cerrarModalImagen()">Cerrar</button>
-  </div>
+     </div>
 </div>
 
 
@@ -434,6 +514,93 @@ async function cargarCategorias() {
 }
 
 
+// ================================================
+// BUSCAR CLIENTE POR NOMBRE (NUEVO)
+// ================================================
+async function buscarClientePorNombre() {
+  const nombreBusqueda = document.getElementById("clienteNombre").value.trim();
+
+  if (nombreBusqueda.length < 3) {
+    alert("Ingrese al menos 3 letras del nombre o apellido para buscar.");
+    return;
+  }
+
+  try {
+    // Buscamos en la tabla 'pedidos' que es donde se guarda el historial del cliente.
+    // Hacemos un "ilike" (case-insensitive search) en el campo 'cliente'.
+    const { data: pedidos, error } = await supabase
+      .from("pedidos")
+      .select("cliente, dni, localidad_id")
+      .ilike("cliente", `%${nombreBusqueda}%`)
+      .limit(20); // Limitamos la búsqueda a 20 resultados para no sobrecargar
+
+    if (error) throw error;
+    if (!pedidos || pedidos.length === 0) {
+      alert(`No se encontraron clientes con el nombre o apellido que contenga: "${nombreBusqueda}"`);
+      return;
+    }
+
+    // 💡 Desduplicar resultados, ya que un cliente puede tener varios pedidos.
+    const clientesUnicos = [];
+    const clientesVistos = new Set();
+    pedidos.forEach(p => {
+      const clave = `${p.cliente}-${p.dni}`; // Usamos nombre y DNI como clave
+      if (!clientesVistos.has(clave) && p.cliente && p.localidad_id) {
+        clientesVistos.add(clave);
+        clientesUnicos.push(p);
+      }
+    });
+
+    if (clientesUnicos.length === 0) {
+      alert(`No se encontraron clientes válidos para: "${nombreBusqueda}"`);
+      return;
+    }
+
+
+    // Crear modal de selección
+    const modal = document.createElement("div");
+    modal.id = "modalBusquedaCliente";
+    modal.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;justify-content:center;align-items:center;z-index:2000;";
+    const contenido = document.createElement("div");
+    contenido.style = "background:white;padding:25px;border-radius:12px;max-width:500px;width:90%;text-align:left;max-height:80vh;overflow-y:auto;";
+    contenido.innerHTML = `
+      <h3 style="margin-top:0;">Seleccione el Cliente:</h3>
+      <small style="color:#777;">Resultados encontrados (${clientesUnicos.length})</small>
+    `;
+    
+    clientesUnicos.forEach(c => {
+      const btn = document.createElement("button");
+      btn.style = "display:block;width:100%;margin:10px 0;padding:12px;background:#3498db;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;text-align:left;";
+      btn.textContent = `${c.cliente || 'Nombre no disponible'} (DNI: ${c.dni || 'No Asignado'})`;
+      
+      btn.onclick = () => {
+        // Rellenar los campos de la tienda
+        document.getElementById("clienteNombre").value = c.cliente;
+        document.getElementById("dni").value = c.dni || '';
+        document.getElementById("clienteLocalidad").value = c.localidad_id;
+        document.body.removeChild(modal);
+        
+      };
+      contenido.appendChild(btn);
+    });
+
+    const cancelar = document.createElement("button");
+    cancelar.textContent = "Cerrar Búsqueda";
+    cancelar.style = "margin-top:20px;padding:12px;width:100%;background:#e74c3c;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;";
+    cancelar.onclick = () => document.body.removeChild(modal);
+    contenido.appendChild(cancelar);
+
+    modal.appendChild(contenido);
+    document.body.appendChild(modal);
+
+  } catch (err) {
+    console.error("Error al buscar cliente:", err);
+    alert("Ocurrió un error al consultar los clientes.");
+  }
+}
+
+
+
 // ================== CARGA LOCALIDADES ==================
 async function cargarLocalidades() {
   const { data, error } = await supabase.from("localidades").select("*").order("nombre", { ascending: true });
@@ -449,15 +616,16 @@ async function cargarLocalidades() {
 }
 
 
-// ================== FUNCIONES DEL MODAL DE IMAGEN (VERSIÓN ORIGINAL) ==================
+// ================== FUNCIONES DEL MODAL DE IMAGEN ==================
 function abrirModalImagen(imgUrl) {
   document.getElementById("imagenModalAmpliada").src = imgUrl;
-  document.getElementById("modalImagen").style.display = "flex"; // ¡Lo importante es que se muestre como 'flex'!
+  document.getElementById("modalImagen").style.display = "flex"; // Debe ser 'flex'
 }
 
 function cerrarModalImagen() {
   document.getElementById("modalImagen").style.display = "none";
 }
+
 
 
 // ================== CARGA PROMOS POR CATEGORÍA ==================
@@ -513,6 +681,7 @@ document.getElementById("busquedaPromo").addEventListener("input", async (e) => 
 });
 
 // ================== RENDER PROMOS (VERSIÓN CORREGIDA) ==================
+// ================== RENDER PROMOS (VERSIÓN CORREGIDA) ==================
 function renderPromos(promos) {
   const cont = document.getElementById("productosContainer");
   cont.innerHTML = "";
@@ -557,34 +726,96 @@ function renderPromos(promos) {
     imgElement.src = imgURL;
     imgElement.alt = nombreEscapado;
     
+// 💡 CORRECCIÓN CLAVE:
+    // Hacemos la imagen clickeable (cursor pointer)
+    imgElement.style.cursor = 'zoom-in';
+
     // 2. AÑADIMOS EL EVENT LISTENER SEGURO
     imgElement.addEventListener('click', () => abrirModalImagen(imgURL));
     
     // 3. CONSTRUIMOS EL RESTO DE LA TARJETA CON innerHTML
-    card.innerHTML = `
+  card.innerHTML = `
       <h3>${p.nombre}</h3>
       ${precioHTML}
-      <button onclick="carritoLista(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">Agregar</button>
-    `;
+      
+            <div style="display:flex; flex-direction:column; gap: 8px; width: 100%; margin: 5px 0 10px 0;">
+        
+                <div id="controls-container-${p.id}" class="quantity-controls-card">
+          <button class="btn-cantidad-menos" onclick="cambiarCantidadCard(${p.id}, -1)">−</button>
+          <span id="cantidad-display-${p.id}" class="cantidad-display-card">1</span>
+          <button class="btn-cantidad-mas" onclick="cambiarCantidadCard(${p.id}, 1)">+</button>
+        </div>
+        
+        <button class="add-to-cart-btn"
+                onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">
+          Agregar
+        </button>
+      </div>
+          `;
     
     // 4. INSERTAMOS LA IMAGEN AL INICIO DE LA TARJETA
     card.prepend(imgElement);
 
-    cont.appendChild(card);
-  });
+   cont.appendChild(card);
+  }); 
 }
 
 
-// ================== CARRITO ==================
-function carritoLista(id, nombre, precio, precio_anterior = null) {
-  const index = pedidoTemp.findIndex(item => item.id === id);
-  if (index !== -1) {
-    pedidoTemp[index].cantidad++;
-  } else {
-    pedidoTemp.push({ id, nombre, precio, precio_anterior, cantidad: 1 });
-  }
-  renderCarritoCliente();
+
+
+// ================== CONTROLADOR DE CANTIDAD EN LA TARJETA (NUEVO) ==================
+function cambiarCantidadCard(id, cambio) {
+  // El ID ahora apunta al <span> que muestra la cantidad
+  const display = document.getElementById(`cantidad-display-${id}`);
+  if (!display) return;
+  
+  let cantidadActual = parseInt(display.textContent, 10);
+  let nuevaCantidad = cantidadActual + cambio;
+
+  // No permitir cantidades menores a 1
+  if (nuevaCantidad < 1) {
+    nuevaCantidad = 1;
+  }
+
+  display.textContent = nuevaCantidad;
 }
+
+
+// ================== FUNCIÓN DE AGREGAR AL CARRITO (LECTOR DE CANTIDAD) ==================
+function agregarAlCarritoDesdeCard(id, nombre, precio, precio_anterior) {
+  // Obtener el valor del <span> de cantidad específico
+  const cantidadDisplay = document.getElementById(`cantidad-display-${id}`);
+  let cantidad = parseInt(cantidadDisplay.textContent, 10); // Lee el contenido del span
+
+  // Si por alguna razón la cantidad es inválida, se establece en 1
+  if (isNaN(cantidad) || cantidad <= 0) {
+    cantidad = 1;
+  }
+
+  // ✅ Llamar a la función del carrito con la cantidad especificada (el 5º parámetro)
+  carritoLista(id, nombre, precio, precio_anterior, cantidad);
+  
+  // Opcional: Reiniciar la cantidad en la tarjeta a 1 después de agregar
+  cantidadDisplay.textContent = 1;
+}
+
+
+// ================== CARRITO LISTA (CON VALOR POR DEFECTO) ==================
+// Asegúrate de que tenga 5 parámetros, con el último en 1 por defecto.
+function carritoLista(id, nombre, precio, precio_anterior = null, cantidadAAgregar = 1) { 
+  const index = pedidoTemp.findIndex(item => item.id === id);
+  
+  if (index !== -1) {
+    // Si existe, suma la cantidad (la línea 811 debe estar por aquí)
+    pedidoTemp[index].cantidad += cantidadAAgregar; // <<-- Usa el parámetro
+  } else {
+    // Si no existe, agrega el nuevo producto con la cantidad
+    pedidoTemp.push({ id, nombre, precio, precio_anterior, cantidad: cantidadAAgregar });
+  }
+  renderCarritoCliente();
+}
+
+
 
 function modificarCantidad(id, cambio) {
   const producto = pedidoTemp.find(p => p.id === id);
@@ -940,6 +1171,23 @@ const dni = (document.getElementById("dni").value || "").trim() || "Sin DNI";
     reiniciarPedido();
   };
 }
+
+
+
+// ================== CERRAR MODAL AL CLIC FUERA (NUEVO) ==================
+
+// Obtener el elemento modal
+const modalImagen = document.getElementById('modalImagen');
+
+// Añadir listener para cerrar al hacer clic en el fondo
+modalImagen.addEventListener('click', function(event) {
+  // Si el clic ocurrió directamente en el elemento modal (el fondo oscuro),
+  // y no en su contenido interno (.modal-content-img), cerramos el modal.
+  if (event.target === modalImagen) {
+    cerrarModalImagen();
+  }
+});
+
 
 
 
