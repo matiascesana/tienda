@@ -878,9 +878,10 @@ async function consultarPedidosCliente() {
   }
 
   try {
+    // 💡 MODIFICACIÓN 1: Incluir 'estado' en la selección
     const { data: pedidos, error } = await supabase
       .from("pedidos")
-      .select("id, created_at, total, productos, cliente")
+      .select("id, created_at, total, productos, cliente, estado") 
       .ilike("dni", `%${dni}%`)
       .order("created_at", { ascending: false });
 
@@ -891,18 +892,42 @@ async function consultarPedidosCliente() {
       return;
     }
 
-    // Crear modal de selección (por si hay más de un pedido con ese DNI)
+    // Crear modal de selección
     const modal = document.createElement("div");
     modal.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:2000;";
     const contenido = document.createElement("div");
-    contenido.style = "background:white;padding:20px;border-radius:12px;max-width:400px;width:90%;text-align:left;";
-    contenido.innerHTML = `<h3>Pedidos encontrados para DNI ${dni}:</h3>`;
+    contenido.style = "background:white;padding:20px;border-radius:12px;max-width:400px;width:90%;text-align:left; max-height:80vh; overflow-y:auto;";
+    contenido.innerHTML = `
+      <h3>Pedidos encontrados para DNI ${dni}:</h3>
+      <p style="font-size:12px; color:#777; margin-top:-10px;">Seleccione un pedido para cargarlo en el carrito.</p>
+    `;
 
     pedidos.forEach(p => {
       const fecha = new Date(p.created_at).toLocaleString("es-AR");
+      // 💡 MODIFICACIÓN 2: Determinar el texto del estado
+      const estadoTexto = p.estado === 'archivado' ? '🔴 ARCHIVADO' : '🟢 ACTIVO';
+
       const btn = document.createElement("button");
-      btn.style = "display:block;width:100%;margin:6px 0;padding:8px;";
-      btn.textContent = `Pedido #${p.id} - ${fecha} - $${p.total.toFixed(2)} (${p.cliente})`;
+      // Ajuste de estilo para que sea más informativo y visual
+      btn.style = `
+        display:block;
+        width:100%;
+        margin:8px 0;
+        padding:12px;
+        border:1px solid #ccc;
+        border-radius:8px;
+        cursor:pointer;
+        font-size:14px;
+        text-align:left;
+        background-color: ${p.estado === 'archivado' ? '#f7dbdb' : '#e0f7e9'};
+        color: #333;
+        transition: background-color 0.2s;
+      `;
+      btn.textContent = `[${estadoTexto}] - ${fecha} - Pedido #${p.id} - ${p.cliente} ($${p.total.toFixed(2)})`;
+      
+      btn.onmouseover = () => btn.style.backgroundColor = p.estado === 'archivado' ? '#f5c8c8' : '#c8e6c9';
+      btn.onmouseout = () => btn.style.backgroundColor = p.estado === 'archivado' ? '#f7dbdb' : '#e0f7e9';
+      
       btn.onclick = () => {
         pedidoTemp = [];
         pedidoExistenteId = p.id;
@@ -925,7 +950,7 @@ async function consultarPedidosCliente() {
 
     const cancelar = document.createElement("button");
     cancelar.textContent = "Cerrar";
-    cancelar.style = "margin-top:10px;padding:8px;width:100%;background:#e74c3c;color:white;border:none;border-radius:8px;";
+    cancelar.style = "margin-top:20px;padding:12px;width:100%;background:#e74c3c;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;";
     cancelar.onclick = () => document.body.removeChild(modal);
     contenido.appendChild(cancelar);
 
@@ -937,7 +962,6 @@ async function consultarPedidosCliente() {
     alert("Ocurrió un error al consultar los pedidos por DNI.");
   }
 }
-
 
 
 
