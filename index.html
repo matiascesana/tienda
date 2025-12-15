@@ -680,84 +680,91 @@ document.getElementById("busquedaPromo").addEventListener("input", async (e) => 
   renderPromos(promos);
 });
 
-// ================== RENDER PROMOS (VERSIÓN CORREGIDA) ==================
-// ================== RENDER PROMOS (VERSIÓN CORREGIDA) ==================
+// ================== RENDER PROMOS (VERSIÓN CORREGIDA CON STOCK) ==================
 function renderPromos(promos) {
-  const cont = document.getElementById("productosContainer");
-  cont.innerHTML = "";
+    const cont = document.getElementById("productosContainer");
+    cont.innerHTML = "";
 
-  if (!promos || promos.length === 0) {
-    cont.innerHTML = "<p style='color:#888;'>No hay productos que coincidan.</p>";
-    return;
-  }
-
-  promos.forEach(p => {
-    const imgURL = p.imagen
-      ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
-      : "https://via.placeholder.com/200x140?text=Sin+Imagen";
-
-    const card = document.createElement("div");
-    card.className = "promo-card";
-    // Utilizamos una función de escape simple para el nombre, aunque se recomienda la robusta que discutimos antes.
-    // Aquí solo estamos enfocados en solucionar el modal, no la seguridad XSS (aún).
-    const nombreEscapado = p.nombre.replace(/'/g, "\\'"); 
-    let precioHTML = "";
-
-    if (p.precio_anterior && p.precio_anterior > p.precio) {
-      const descuento = Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100);
-      precioHTML = `
-        <p style="margin: 5px 0; text-align:center;">
-          <span style="text-decoration: line-through; color: #888; font-size: 13px;">
-            $${p.precio_anterior.toFixed(2)}
-          </span><br>
-          <span style="color: #e74c3c; font-weight: bold; font-size: 15px;">
-            $${p.precio.toFixed(2)}
-          </span>
-          <span style="color:#27ae60; font-size:13px; font-weight:bold;">
-            (-${descuento}%)
-          </span>
-        </p>`;
-    } else {
-      precioHTML = `<p style="color: #e74c3c; font-weight: bold;">$${p.precio.toFixed(2)}</p>`;
+    if (!promos || promos.length === 0) {
+        cont.innerHTML = "<p style='color:#888;'>No hay productos que coincidan.</p>";
+        return;
     }
-    
-    // 1. CREAMOS LA IMAGEN COMO ELEMENTO JS
-    const imgElement = document.createElement('img');
-    imgElement.src = imgURL;
-    imgElement.alt = nombreEscapado;
-    
-// 💡 CORRECCIÓN CLAVE:
-    // Hacemos la imagen clickeable (cursor pointer)
-    imgElement.style.cursor = 'zoom-in';
 
-    // 2. AÑADIMOS EL EVENT LISTENER SEGURO
-    imgElement.addEventListener('click', () => abrirModalImagen(imgURL));
-    
-    // 3. CONSTRUIMOS EL RESTO DE LA TARJETA CON innerHTML
-  card.innerHTML = `
-      <h3>${p.nombre}</h3>
-      ${precioHTML}
-      
-            <div style="display:flex; flex-direction:column; gap: 8px; width: 100%; margin: 5px 0 10px 0;">
-        
-                <div id="controls-container-${p.id}" class="quantity-controls-card">
-          <button class="btn-cantidad-menos" onclick="cambiarCantidadCard(${p.id}, -1)">−</button>
-          <span id="cantidad-display-${p.id}" class="cantidad-display-card">1</span>
-          <button class="btn-cantidad-mas" onclick="cambiarCantidadCard(${p.id}, 1)">+</button>
-        </div>
-        
-        <button class="add-to-cart-btn"
-                onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">
-          Agregar
-        </button>
-      </div>
-          `;
-    
-    // 4. INSERTAMOS LA IMAGEN AL INICIO DE LA TARJETA
-    card.prepend(imgElement);
+    promos.forEach(p => {
+        const imgURL = p.imagen
+            ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
+            : "https://via.placeholder.com/200x140?text=Sin+Imagen";
 
-   cont.appendChild(card);
-  }); 
+        const card = document.createElement("div");
+        card.className = "promo-card";
+        const nombreEscapado = p.nombre.replace(/'/g, "\\'");
+        let precioHTML = "";
+        
+        // Determinar el color y estado del stock
+        const stock = p.stock || 0;
+        let stockColor = '#27ae60'; // Verde
+        let stockText = `Stock: ${stock}`;
+
+        if (stock < 5 && stock > 0) {
+            stockColor = '#f39c12'; // Naranja (Poco stock)
+        } else if (stock === 0) {
+            stockColor = '#e74c3c'; // Rojo (Sin stock)
+            stockText = '¡AGOTADO!';
+        }
+
+        if (p.precio_anterior && p.precio_anterior > p.precio) {
+            const descuento = Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100);
+            precioHTML = `
+                <p style="margin: 5px 0; text-align:center;">
+                    <span style="text-decoration: line-through; color: #888; font-size: 13px;">
+                        $${p.precio_anterior.toFixed(2)}
+                    </span><br>
+                    <span style="color: #e74c3c; font-weight: bold; font-size: 15px;">
+                        $${p.precio.toFixed(2)}
+                    </span>
+                    <span style="color:#27ae60; font-size:13px; font-weight:bold;">
+                        (-${descuento}%)
+                    </span>
+                </p>`;
+        } else {
+            precioHTML = `<p style="color: #e74c3c; font-weight: bold;">$${p.precio.toFixed(2)}</p>`;
+        }
+        
+        // 1. CREAMOS LA IMAGEN COMO ELEMENTO JS
+        const imgElement = document.createElement('img');
+        imgElement.src = imgURL;
+        imgElement.alt = nombreEscapado;
+        imgElement.style.cursor = 'zoom-in';
+        imgElement.addEventListener('click', () => abrirModalImagen(imgURL));
+        
+        // 2. CONSTRUIMOS EL RESTO DE LA TARJETA CON innerHTML
+        card.innerHTML = `
+            <h3>${p.nombre}</h3>
+            <span style="font-size: 12px; font-weight: bold; color: ${stockColor}; margin-bottom: 5px;">
+                ${stockText}
+            </span>
+            ${precioHTML}
+                
+                <div style="display:flex; flex-direction:column; gap: 8px; width: 100%; margin: 5px 0 10px 0;">
+            
+                    <div id="controls-container-${p.id}" class="quantity-controls-card">
+                        <button class="btn-cantidad-menos" onclick="cambiarCantidadCard(${p.id}, -1)">−</button>
+                        <span id="cantidad-display-${p.id}" class="cantidad-display-card">1</span>
+                        <button class="btn-cantidad-mas" onclick="cambiarCantidadCard(${p.id}, 1)">+</button>
+                    </div>
+            
+                    <button class="add-to-cart-btn"
+                        onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">
+                        Agregar
+                    </button>
+                </div>
+                  `;
+        
+        // 3. INSERTAMOS LA IMAGEN AL INICIO DE LA TARJETA
+        card.prepend(imgElement);
+
+        cont.appendChild(card);
+    });
 }
 
 
