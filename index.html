@@ -1000,23 +1000,17 @@ async function confirmarPedido() {
   const nombreCliente = document.getElementById("clienteNombre").value.trim();
   const localidadId = document.getElementById("clienteLocalidad").value;
   const totalCalculado = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
-const dni = document.getElementById("dni").value.trim();
+  const dni = document.getElementById("dni").value.trim();
 
   try {
+    // 1. Guardar o actualizar el pedido
     if (pedidoExistenteId) {
-      // Actualizar pedido existente
       const { error } = await supabase
         .from("pedidos")
-        .update({
-	  dni: dni,
-          total: totalCalculado,
-          productos: pedidoTemp
-        })
+        .update({ dni: dni, total: totalCalculado, productos: pedidoTemp })
         .eq("id", pedidoExistenteId);
       if (error) throw error;
-      console.log("Pedido actualizado:", pedidoExistenteId);
     } else {
-      // Crear nuevo pedido
       const { data, error } = await supabase
         .from("pedidos")
         .insert([{
@@ -1030,18 +1024,31 @@ const dni = document.getElementById("dni").value.trim();
         .select();
       if (error) throw error;
       pedidoExistenteId = data[0].id;
-      console.log("Nuevo pedido guardado:", pedidoExistenteId);
     }
+
+    // ========================================================
+    // NUEVO: DESCONTAR STOCK DE CADA PRODUCTO
+    // ========================================================
+    for (const prod of pedidoTemp) {
+      const { error: errorStock } = await supabase.rpc('descontar_stock', {
+        producto_id: prod.id,
+        cantidad_a_descontar: prod.cantidad
+      });
+      
+      if (errorStock) {
+        console.error(`Error descontando stock para ID ${prod.id}:`, errorStock);
+      }
+    }
+    // ========================================================
 
     // Mostrar modal de PDF
     document.getElementById("modalPDF").style.display = "flex";
 
   } catch (err) {
     console.error(err);
-    alert("Ocurrió un error al guardar el pedido en la base de datos.");
+    alert("Ocurrió un error al procesar el pedido.");
   }
 }
-
 
 function reiniciarPedido() {
   pedidoTemp = [];
