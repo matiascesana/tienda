@@ -479,20 +479,24 @@
 
 <script>
 
-// 1. Configuración de Supabase
+// Usamos un nombre diferente para la instancia (supabaseClient) 
+// para evitar conflictos con el objeto global 'window.supabase' de la librería.
 const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
 
-// 2. Inicialización del cliente con un nombre único para evitar conflictos
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Opción ultra-segura: solo declarar si no existe
+if (typeof supabaseClient === 'undefined') {
+    window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
-// 3. Variables de estado de la aplicación
+// Para que el resto de tu código siga funcionando sin cambiar nada:
+var supabase = window.supabaseClient;
+
+
 let carritoCliente = [];
 let todasLasPromos = [];
 let pedidoTemp = [];
 let pedidoExistenteId = null;
-
-
 
 // ================== CARGA CATEGORÍAS ==================
 async function cargarCategorias() {
@@ -610,7 +614,7 @@ async function buscarClientePorNombre() {
 
 // ================== CARGA LOCALIDADES ==================
 async function cargarLocalidades() {
-  const { data, error } = await sun_db.from("localidades").select("*").order("nombre", { ascending: true });
+  const { data, error } = await supabase.from("localidades").select("*").order("nombre", { ascending: true });
   if (error) return console.error(error);
   const select = document.getElementById("clienteLocalidad");
   select.innerHTML = '<option value="">Seleccionar localidad...</option>';
@@ -999,14 +1003,13 @@ async function confirmarPedido() {
   const dni = document.getElementById("dni").value.trim();
 
   try {
-    // 1. Guardar o actualizar el pedido en la tabla 'pedidos'
-    let pedidoId;
+    // 1. Guardar o actualizar el pedido
     if (pedidoExistenteId) {
-      const { error } = await sun_db.from("pedidos")
+      const { error } = await supabase
+        .from("pedidos")
         .update({ dni: dni, total: totalCalculado, productos: pedidoTemp })
         .eq("id", pedidoExistenteId);
       if (error) throw error;
-      pedidoId = pedidoExistenteId;
     } else {
       const { data, error } = await supabase
         .from("pedidos")
@@ -1020,28 +1023,25 @@ async function confirmarPedido() {
         }])
         .select();
       if (error) throw error;
-      pedidoId = data[0].id;
-      pedidoExistenteId = pedidoId;
+      pedidoExistenteId = data[0].id;
     }
 
     // ========================================================
-    // NUEVO: LOGICA PARA DESCONTAR EL STOCK
+    // NUEVO: DESCONTAR STOCK DE CADA PRODUCTO
     // ========================================================
-    // Recorremos cada producto que está en el carrito (pedidoTemp)
-    for (const item of pedidoTemp) {
+    for (const prod of pedidoTemp) {
       const { error: errorStock } = await supabase.rpc('descontar_stock', {
-        producto_id: item.id,
-        cantidad_a_descontar: item.cantidad
+        producto_id: prod.id,
+        cantidad_a_descontar: prod.cantidad
       });
-
+      
       if (errorStock) {
-        console.error(`Error al descontar stock del producto ${item.id}:`, errorStock);
-        // Opcional: podrías avisar al usuario si un producto no tiene suficiente stock
+        console.error(`Error descontando stock para ID ${prod.id}:`, errorStock);
       }
     }
     // ========================================================
 
-    // Mostrar modal de éxito y PDF
+    // Mostrar modal de PDF
     document.getElementById("modalPDF").style.display = "flex";
 
   } catch (err) {
