@@ -483,16 +483,10 @@
 const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
 
-// 2. Inicializamos el cliente si no existe
-if (!window.supabaseClient) {
-    window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-}
+// 2. Inicialización del cliente con un nombre único para evitar conflictos
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 3. Asignamos la instancia a la variable global 'supabase' sin usar 'let' ni 'const'
-// Esto evita el error de "already declared" y permite que tus funciones la usen.
-window.supabase = window.supabaseClient;
-
-
+// 3. Variables de estado de la aplicación
 let carritoCliente = [];
 let todasLasPromos = [];
 let pedidoTemp = [];
