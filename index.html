@@ -479,18 +479,18 @@
 
 <script>
 
-// Usamos un nombre diferente para la instancia (supabaseClient) 
-// para evitar conflictos con el objeto global 'window.supabase' de la librería.
+// 1. Configuración de Supabase
 const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
 
-// Opción ultra-segura: solo declarar si no existe
-if (typeof supabaseClient === 'undefined') {
+// 2. Inicializamos el cliente si no existe
+if (!window.supabaseClient) {
     window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-// Para que el resto de tu código siga funcionando sin cambiar nada:
-var supabase = window.supabaseClient;
+// 3. Asignamos la instancia a la variable global 'supabase' sin usar 'let' ni 'const'
+// Esto evita el error de "already declared" y permite que tus funciones la usen.
+window.supabase = window.supabaseClient;
 
 
 let carritoCliente = [];
