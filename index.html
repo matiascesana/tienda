@@ -483,10 +483,11 @@
 const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
 
-// 2. Inicialización del cliente con un nombre único para evitar conflictos
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// 2. Inicializamos el cliente con un nombre DISTINTO (ej: 'sun_db') para evitar errores
+// No usamos 'const supabase' porque la librería ya usa ese nombre.
+const sun_db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 3. Variables de estado de la aplicación
+// 3. Variables de estado
 let carritoCliente = [];
 let todasLasPromos = [];
 let pedidoTemp = [];
@@ -608,7 +609,7 @@ async function buscarClientePorNombre() {
 
 // ================== CARGA LOCALIDADES ==================
 async function cargarLocalidades() {
-  const { data, error } = await supabase.from("localidades").select("*").order("nombre", { ascending: true });
+  const { data, error } = await sun_db.from("localidades").select("*").order("nombre", { ascending: true });
   if (error) return console.error(error);
   const select = document.getElementById("clienteLocalidad");
   select.innerHTML = '<option value="">Seleccionar localidad...</option>';
@@ -674,7 +675,7 @@ document.getElementById("busquedaPromo").addEventListener("input", async (e) => 
     return;
   }
 
-  let query = supabase.from("promociones").select("*");
+  let query = sun_db.from("promociones").select("*");
   if (catId) query = query.eq("categoria_id", catId);
   if (texto.length > 0) query = query.ilike("nombre", `%${texto}%`);
 
@@ -891,8 +892,7 @@ async function consultarPedidosCliente() {
 
   try {
     // 💡 MODIFICACIÓN 1: Incluir 'estado' en la selección
-    const { data: pedidos, error } = await supabase
-      .from("pedidos")
+    const { data: pedidos, error } = await sun_db.from("pedidos")
       .select("id, created_at, total, productos, cliente, estado") 
       .ilike("dni", `%${dni}%`)
       .order("created_at", { ascending: false });
