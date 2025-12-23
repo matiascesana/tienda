@@ -126,18 +126,16 @@
     background: #1e8449;
   }
 
+  #consultarPedidosCliente {
+    background-color: #f39c12 !important;
+    color: white !important;
+    border: none !important;
+    transition: background-color 0.2s;
+  }
 
-    #consultarPedidosCliente {
-    background-color: #f39c12 !important; /* Color naranja */
-    color: white !important;
-    border: none !important;
-    transition: background-color 0.2s;
-  }
-  
-  #consultarPedidosCliente:hover {
-    background-color: #e67e22 !important; /* Naranja más oscuro al pasar el ratón */
-  }
-
+  #consultarPedidosCliente:hover {
+    background-color: #e67e22 !important;
+  }
 
   #carritoResumen {
     margin-top: 20px;
@@ -256,60 +254,59 @@
     color:white;
   }
 
-/* NUEVO Modal para la imagen ampliada */
-#modalImagen {
-  display: none; /* Oculto por defecto */
-  position: fixed !important; /* FORZAR POSICIONAMIENTO FIJO */
-  z-index: 99999 !important; /* FORZAR MÁXIMA PRIORIDAD */
-  left: 0 !important;
-  top: 0 !important;
-  width: 100%;
-  height: 100%;
-  overflow: auto; 
-  background-color: rgba(0,0,0,0.9); /* Fondo oscuro */
-  align-items: center;
-  justify-content: center;
-}
+  /* Modal para la imagen ampliada */
+  #modalImagen {
+    display: none;
+    position: fixed !important;
+    z-index: 99999 !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100%;
+    height: 100%;
+    overflow: auto; 
+    background-color: rgba(0,0,0,0.9);
+    align-items: center;
+    justify-content: center;
+  }
 
-  #modalImagen .modal-content-img {
-    position: relative;
-    margin: auto;
-    padding: 20px;
-    background-color: #fefefe;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    text-align: center;
-    max-width: 90%;
-    max-height: 90%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
+  #modalImagen .modal-content-img {
+    position: relative;
+    margin: auto;
+    padding: 20px;
+    background-color: #fefefe;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    text-align: center;
+    max-width: 90%;
+    max-height: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
 
-  #modalImagen img {
-    max-width: 100%;
-    max-height: 75vh; /* Altura máxima del 75% del viewport */
-    display: block;
-    margin: 0 auto 15px auto;
-    border-radius: 8px;
-  }
+  #modalImagen img {
+    max-width: 100%;
+    max-height: 75vh;
+    display: block;
+    margin: 0 auto 15px auto;
+    border-radius: 8px;
+  }
 
-  #modalImagen .close-button {
-    background-color: #e74c3c;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.2s;
-  }
+  #modalImagen .close-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s;
+  }
 
-  #modalImagen .close-button:hover {
-    background-color: #c0392b;
-  }
+  #modalImagen .close-button:hover {
+    background-color: #c0392b;
+  }
 
-  /* Botón consultar pedidos móvil más pequeño */
   @media (max-width: 800px) {
     #consultarPedidosCliente {
       font-size: 18px;
@@ -330,82 +327,66 @@
     }
   }
 
+  .quantity-controls-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 35px;
+    max-width: 120px;
+    margin: 0 auto;
+  }
 
+  .btn-cantidad-menos, .btn-cantidad-mas {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 0;
+    width: 35px;
+    height: 100%;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
+    transition: background-color 0.2s;
+    line-height: 1;
+  }
 
-/* =================== NUEVOS ESTILOS PARA EL SELECTOR DE CANTIDAD EN LA TARJETA =================== */
+  .btn-cantidad-menos:hover, .btn-cantidad-mas:hover {
+    background-color: #2980b9;
+  }
 
-/* Contenedor Flex para los botones +/- y la cantidad */
-.quantity-controls-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  overflow: hidden;
-  height: 35px; /* Altura más pequeña */
-  max-width: 120px; /* Ancho máximo para que sea chico */
-  margin: 0 auto; /* Centrar los controles */
-}
+  .cantidad-display-card {
+    flex-grow: 1;
+    text-align: center;
+    font-weight: bold;
+    font-size: 16px;
+    color: #333;
+    padding: 0 5px;
+  }
 
-/* Estilo de los botones +/- */
-.btn-cantidad-menos, .btn-cantidad-mas {
-  background: #3498db;
-  color: white;
-  border: none;
-  padding: 0;
-  width: 35px; /* Ancho fijo */
-  height: 100%;
-  cursor: pointer;
-  font-size: 18px;
-  font-weight: bold;
-  transition: background-color 0.2s;
-  line-height: 1; /* Asegura el centrado vertical del texto */
-}
+  .add-to-cart-btn {
+    background: #27ae60;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    width: 100%;
+    transition: 0.2s;
+  }
 
-/* Efecto hover */
-.btn-cantidad-menos:hover, .btn-cantidad-mas:hover {
-  background-color: #2980b9;
-}
-
-/* Estilo para el número de cantidad (el <span>) */
-.cantidad-display-card {
-  flex-grow: 1;
-  text-align: center;
-  font-weight: bold;
-  font-size: 16px;
-  color: #333;
-  padding: 0 5px;
-}
-
-/* Ajuste al botón general de Agregar */
-.add-to-cart-btn {
-  /* Reutiliza el estilo base del promo-card button */
-  background: #27ae60;
-  color: #fff;
-  border: none;
-  padding: 10px; /* Un poco más pequeño */
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 15px;
-  width: 100%;
-  transition: 0.2s;
-}
-
-.add-to-cart-btn:hover {
-  background: #1e8449;
-}
-
-
-
-
+  .add-to-cart-btn:hover {
+    background: #1e8449;
+  }
 </style>
-
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
-
+</head>
 
 <body>
 <header>
@@ -420,15 +401,15 @@
   <p><b>Total:</b> <span id="carritoTotal">$0.00</span></p>
 
   <h3>Datos del Cliente</h3>
-  <div style="display:flex;gap:10px; flex-wrap:wrap;">
-    <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required style="flex:1;">
-<button onclick="buscarClientePorNombre()" id="buscarClienteBtn" style="background:#f39c12; color:white; border:none; border-radius:8px; padding:12px 16px; margin-top:12px; cursor:pointer;">Buscar Cliente</button>
- </div>
+  <div style="display:flex;gap:10px; flex-wrap:wrap;">
+    <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required style="flex:1;">
+    <button onclick="buscarClientePorNombre()" id="buscarClienteBtn" style="background:#f39c12; color:white; border:none; border-radius:8px; padding:12px 16px; margin-top:12px; cursor:pointer;">Buscar Cliente</button>
+  </div>
 
-  <div style="display:flex;gap:10px; flex-wrap:wrap;">
-    <input id="dni" type="text" placeholder="DNI sin puntos" style="flex:1;">
-<button onclick="consultarPedidosCliente()" id="consultarPedidosCliente">Consultar pedidos ya cargados</button>
- </div>
+  <div style="display:flex;gap:10px; flex-wrap:wrap;">
+    <input id="dni" type="text" placeholder="DNI sin puntos" style="flex:1;">
+    <button onclick="consultarPedidosCliente()" id="consultarPedidosCliente" style="border-radius: 8px; padding: 12px 16px; margin-top: 12px; cursor: pointer;">Consultar pedidos ya cargados</button>
+  </div>
 
   <select id="clienteLocalidad" required>
     <option value="">Seleccionar localidad...</option>
@@ -452,7 +433,6 @@
 
 <footer>Distribuidora Allana © 2025</footer>
 
-<!-- Modal de confirmación PDF -->
 <div id="modalPDF">
   <div class="modal-content">
     <p>✅ Pedido enviado correctamente. ¿Desea descargar el PDF con el detalle del pedido?</p>
@@ -461,147 +441,124 @@
   </div>
 </div>
 
-
 <div id="modalImagen">
-<button class="close-button" onclick="cerrarModalImagen()">Cerrar</button>
-  <div class="modal-content-img"></div>
-    <img id="imagenModalAmpliada" src="" alt="Imagen Ampliada">
-     </div>
+  <div class="modal-content-img">
+    <button class="close-button" onclick="cerrarModalImagen()">Cerrar</button>
+    <img id="imagenModalAmpliada" src="" alt="Imagen Ampliada">
+  </div>
 </div>
 
-
-
-<!-- Botón de WhatsApp -->
 <a href="https://wa.me/5493854784659?text=Hola%20te%20escribo%20de%20tu%20página%20de%20pedidos" target="_blank"
    style="position: fixed; bottom: 20px; right: 20px; background-color: #25D366; color: white; border-radius: 50%; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; text-decoration: none; font-size: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 1000;">
-<img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" style="width:60px; height:60px;">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" style="width:60px; height:60px;">
 </a>
 
 <script>
+// --- CONFIGURACIÓN DE SUPABASE ---
+const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
 
-const URL_DB = "https://ejbqlejlgprvwzrptojo.supabase.co";
-const KEY_DB = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
+// Usamos 'sb' para evitar conflictos con la variable global 'supabase' que inyecta la CDN
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Usamos 'sb' para evitar conflictos con el objeto global 'supabase' de la CDN
-const sb = window.supabase.createClient(URL_DB, KEY_DB);
-
-
-let carritoCliente = [];
 let todasLasPromos = [];
 let pedidoTemp = [];
 let pedidoExistenteId = null;
 
 // ================== CARGA CATEGORÍAS ==================
 async function cargarCategorias() {
-  // Usamos .order('nombre', { ascending: true }) para ordenar alfabéticamente
-  const { data, error } = await sb.from("categorias")
-    .select("*")
-    .order("nombre", { ascending: true }); // A-Z
+  const { data, error } = await sb
+    .from("categorias")
+    .select("*")
+    .order("nombre", { ascending: true });
 
-  if (error) {
-    // Si hay un error, lo registramos y salimos de la función
-    console.error("Error al cargar categorías:", error);
-    return; 
-  }
-  
-  // Si la consulta es exitosa, llenamos el desplegable
-  const select = document.getElementById("categoriaSelect");
-  select.innerHTML = '<option value="">Seleccionar categoría...</option>';
-  
-  data.forEach(cat => {
-    const opt = document.createElement("option");
-    opt.value = cat.id;
-    opt.textContent = cat.nombre;
-    select.appendChild(opt);
-  });
+  if (error) {
+    console.error("Error al cargar categorías:", error);
+    return; 
+  }
+  
+  const select = document.getElementById("categoriaSelect");
+  select.innerHTML = '<option value="">Seleccionar categoría...</option>';
+  
+  data.forEach(cat => {
+    const opt = document.createElement("option");
+    opt.value = cat.id;
+    opt.textContent = cat.nombre;
+    select.appendChild(opt);
+  });
 }
 
-
-// ================================================
-// BUSCAR CLIENTE POR NOMBRE (NUEVO)
-// ================================================
+// ================== BUSCAR CLIENTE POR NOMBRE ==================
 async function buscarClientePorNombre() {
-  const nombreBusqueda = document.getElementById("clienteNombre").value.trim();
+  const nombreBusqueda = document.getElementById("clienteNombre").value.trim();
 
-  if (nombreBusqueda.length < 3) {
-    alert("Ingrese al menos 3 letras del nombre o apellido para buscar.");
-    return;
-  }
+  if (nombreBusqueda.length < 3) {
+    alert("Ingrese al menos 3 letras del nombre o apellido para buscar.");
+    return;
+  }
 
-  try {
-    // Buscamos en la tabla 'pedidos' que es donde se guarda el historial del cliente.
-    // Hacemos un "ilike" (case-insensitive search) en el campo 'cliente'.
-    const { data: pedidos, error } = await sb.from("pedidos")
-      .select("cliente, dni, localidad_id")
-      .ilike("cliente", `%${nombreBusqueda}%`)
-      .limit(20); // Limitamos la búsqueda a 20 resultados para no sobrecargar
+  try {
+    const { data: pedidos, error } = await sb
+      .from("pedidos")
+      .select("cliente, dni, localidad_id")
+      .ilike("cliente", `%${nombreBusqueda}%`)
+      .limit(20);
 
-    if (error) throw error;
-    if (!pedidos || pedidos.length === 0) {
-      alert(`No se encontraron clientes con el nombre o apellido que contenga: "${nombreBusqueda}"`);
-      return;
-    }
+    if (error) throw error;
+    if (!pedidos || pedidos.length === 0) {
+      alert(`No se encontraron clientes con: "${nombreBusqueda}"`);
+      return;
+    }
 
-    // 💡 Desduplicar resultados, ya que un cliente puede tener varios pedidos.
-    const clientesUnicos = [];
-    const clientesVistos = new Set();
-    pedidos.forEach(p => {
-      const clave = `${p.cliente}-${p.dni}`; // Usamos nombre y DNI como clave
-      if (!clientesVistos.has(clave) && p.cliente && p.localidad_id) {
-        clientesVistos.add(clave);
-        clientesUnicos.push(p);
-      }
-    });
+    const clientesUnicos = [];
+    const clientesVistos = new Set();
+    pedidos.forEach(p => {
+      const clave = `${p.cliente}-${p.dni}`;
+      if (!clientesVistos.has(clave) && p.cliente && p.localidad_id) {
+        clientesVistos.add(clave);
+        clientesUnicos.push(p);
+      }
+    });
 
-    if (clientesUnicos.length === 0) {
-      alert(`No se encontraron clientes válidos para: "${nombreBusqueda}"`);
-      return;
-    }
+    if (clientesUnicos.length === 0) {
+      alert("No se encontraron clientes válidos.");
+      return;
+    }
 
+    const modal = document.createElement("div");
+    modal.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;justify-content:center;align-items:center;z-index:2000;";
+    const contenido = document.createElement("div");
+    contenido.style = "background:white;padding:25px;border-radius:12px;max-width:500px;width:90%;text-align:left;max-height:80vh;overflow-y:auto;";
+    contenido.innerHTML = `<h3 style="margin-top:0;">Seleccione el Cliente:</h3>`;
+    
+    clientesUnicos.forEach(c => {
+      const btn = document.createElement("button");
+      btn.style = "display:block;width:100%;margin:10px 0;padding:12px;background:#3498db;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;text-align:left;";
+      btn.textContent = `${c.cliente} (DNI: ${c.dni || 'No Asignado'})`;
+      
+      btn.onclick = () => {
+        document.getElementById("clienteNombre").value = c.cliente;
+        document.getElementById("dni").value = c.dni || '';
+        document.getElementById("clienteLocalidad").value = c.localidad_id;
+        document.body.removeChild(modal);
+      };
+      contenido.appendChild(btn);
+    });
 
-    // Crear modal de selección
-    const modal = document.createElement("div");
-    modal.id = "modalBusquedaCliente";
-    modal.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;justify-content:center;align-items:center;z-index:2000;";
-    const contenido = document.createElement("div");
-    contenido.style = "background:white;padding:25px;border-radius:12px;max-width:500px;width:90%;text-align:left;max-height:80vh;overflow-y:auto;";
-    contenido.innerHTML = `
-      <h3 style="margin-top:0;">Seleccione el Cliente:</h3>
-      <small style="color:#777;">Resultados encontrados (${clientesUnicos.length})</small>
-    `;
-    
-    clientesUnicos.forEach(c => {
-      const btn = document.createElement("button");
-      btn.style = "display:block;width:100%;margin:10px 0;padding:12px;background:#3498db;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;text-align:left;";
-      btn.textContent = `${c.cliente || 'Nombre no disponible'} (DNI: ${c.dni || 'No Asignado'})`;
-      
-      btn.onclick = () => {
-        // Rellenar los campos de la tienda
-        document.getElementById("clienteNombre").value = c.cliente;
-        document.getElementById("dni").value = c.dni || '';
-        document.getElementById("clienteLocalidad").value = c.localidad_id;
-        document.body.removeChild(modal);
-        
-      };
-      contenido.appendChild(btn);
-    });
+    const cancelar = document.createElement("button");
+    cancelar.textContent = "Cerrar Búsqueda";
+    cancelar.style = "margin-top:20px;padding:12px;width:100%;background:#e74c3c;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;";
+    cancelar.onclick = () => document.body.removeChild(modal);
+    contenido.appendChild(cancelar);
 
-    const cancelar = document.createElement("button");
-    cancelar.textContent = "Cerrar Búsqueda";
-    cancelar.style = "margin-top:20px;padding:12px;width:100%;background:#e74c3c;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;";
-    cancelar.onclick = () => document.body.removeChild(modal);
-    contenido.appendChild(cancelar);
+    modal.appendChild(contenido);
+    document.body.appendChild(modal);
 
-    modal.appendChild(contenido);
-    document.body.appendChild(modal);
-
-  } catch (err) {
-    console.error("Error al buscar cliente:", err);
-    alert("Ocurrió un error al consultar los clientes.");
-  }
+  } catch (err) {
+    console.error(err);
+    alert("Error al consultar clientes.");
+  }
 }
-
-
 
 // ================== CARGA LOCALIDADES ==================
 async function cargarLocalidades() {
@@ -617,48 +574,40 @@ async function cargarLocalidades() {
   });
 }
 
-
-// ================== FUNCIONES DEL MODAL DE IMAGEN ==================
+// ================== MODAL IMAGEN ==================
 function abrirModalImagen(imgUrl) {
-  document.getElementById("imagenModalAmpliada").src = imgUrl;
-  document.getElementById("modalImagen").style.display = "flex"; // Debe ser 'flex'
+  document.getElementById("imagenModalAmpliada").src = imgUrl;
+  document.getElementById("modalImagen").style.display = "flex";
 }
 
 function cerrarModalImagen() {
-  document.getElementById("modalImagen").style.display = "none";
+  document.getElementById("modalImagen").style.display = "none";
 }
 
-
-
-// ================== CARGA PROMOS POR CATEGORÍA ==================
+// ================== CARGA PROMOS ==================
 async function cargarPromosPorCategoria() {
   const catId = document.getElementById("categoriaSelect").value;
   const cont = document.getElementById("productosContainer");
   cont.innerHTML = "";
   if (!catId) return;
 
-  const { data: promos, error } = await sb.from("promociones")
+  const { data: promos, error } = await sb
+    .from("promociones")
     .select("*")
     .eq("categoria_id", catId);
-
 
   if (error) {
     cont.innerHTML = "<p style='color:red;'>Error al cargar productos.</p>";
     return;
   }
 
-  // 🔤 Ordenar alfabéticamente por nombre
   promos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
-
-
-
   todasLasPromos = promos;
   renderPromos(promos);
 }
 
-// ================== FILTRAR POR NOMBRE ==================
+// ================== FILTRADO BÚSQUEDA ==================
 let controlBusqueda = 0;
-
 document.getElementById("busquedaPromo").addEventListener("input", async (e) => {
   const texto = e.target.value.trim().toLowerCase();
   const catId = document.getElementById("categoriaSelect").value;
@@ -675,166 +624,111 @@ document.getElementById("busquedaPromo").addEventListener("input", async (e) => 
   if (texto.length > 0) query = query.ilike("nombre", `%${texto}%`);
 
   const { data: promos, error } = await query;
-
   if (idControlActual !== controlBusqueda) return;
   if (error) { cont.innerHTML = "<p style='color:red;'>Error al buscar promociones.</p>"; return; }
   renderPromos(promos);
 });
 
-// ================== RENDER PROMOS (VERSIÓN CORREGIDA CON STOCK) ==================
+// ================== RENDERIZADO TARJETAS ==================
 function renderPromos(promos) {
-    const cont = document.getElementById("productosContainer");
-    cont.innerHTML = "";
+  const cont = document.getElementById("productosContainer");
+  cont.innerHTML = "";
 
-    if (!promos || promos.length === 0) {
-        cont.innerHTML = "<p style='color:#888;'>No hay productos que coincidan.</p>";
-        return;
-    }
+  if (!promos || promos.length === 0) {
+    cont.innerHTML = "<p style='color:#888;'>No hay productos que coincidan.</p>";
+    return;
+  }
 
-    promos.forEach(p => {
-        const imgURL = p.imagen
-            ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
-            : "https://via.placeholder.com/200x140?text=Sin+Imagen";
+  promos.forEach(p => {
+    const imgURL = p.imagen
+      ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
+      : "https://via.placeholder.com/200x140?text=Sin+Imagen";
 
-        const card = document.createElement("div");
-        card.className = "promo-card";
-        const nombreEscapado = p.nombre.replace(/'/g, "\\'");
-        let precioHTML = "";
-        
-        // Determinar el color y estado del stock
-        const stock = p.stock || 0;
-        let stockColor = '#27ae60'; // Verde
-        let stockText = `Stock: ${stock}`;
+    const card = document.createElement("div");
+    card.className = "promo-card";
+    const nombreEscapado = p.nombre.replace(/'/g, "\\'");
+    
+    const stock = p.stock || 0;
+    let stockColor = '#27ae60';
+    let stockText = `Stock: ${stock}`;
 
-        if (stock < 5 && stock > 0) {
-            stockColor = '#f39c12'; // Naranja (Poco stock)
-        } else if (stock === 0) {
-            stockColor = '#e74c3c'; // Rojo (Sin stock)
-            stockText = '¡AGOTADO!';
-        }
+    if (stock < 5 && stock > 0) {
+      stockColor = '#f39c12';
+    } else if (stock === 0) {
+      stockColor = '#e74c3c';
+      stockText = '¡AGOTADO!';
+    }
 
-        if (p.precio_anterior && p.precio_anterior > p.precio) {
-            const descuento = Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100);
-            precioHTML = `
-                <p style="margin: 5px 0; text-align:center;">
-                    <span style="text-decoration: line-through; color: #888; font-size: 13px;">
-                        $${p.precio_anterior.toFixed(2)}
-                    </span><br>
-                    <span style="color: #e74c3c; font-weight: bold; font-size: 15px;">
-                        $${p.precio.toFixed(2)}
-                    </span>
-                    <span style="color:#27ae60; font-size:13px; font-weight:bold;">
-                        (-${descuento}%)
-                    </span>
-                </p>`;
-        } else {
-            precioHTML = `<p style="color: #e74c3c; font-weight: bold;">$${p.precio.toFixed(2)}</p>`;
-        }
-        
-        // 1. CREAMOS LA IMAGEN COMO ELEMENTO JS
-        const imgElement = document.createElement('img');
-        imgElement.src = imgURL;
-        imgElement.alt = nombreEscapado;
-        imgElement.style.cursor = 'zoom-in';
-        imgElement.addEventListener('click', () => abrirModalImagen(imgURL));
-        
-        // 2. CONSTRUIMOS EL RESTO DE LA TARJETA CON innerHTML
-        card.innerHTML = `
-            <h3>${p.nombre}</h3>
-            <span style="font-size: 12px; font-weight: bold; color: ${stockColor}; margin-bottom: 5px;">
-                ${stockText}
-            </span>
-            ${precioHTML}
-                
-                <div style="display:flex; flex-direction:column; gap: 8px; width: 100%; margin: 5px 0 10px 0;">
-            
-                    <div id="controls-container-${p.id}" class="quantity-controls-card">
-                        <button class="btn-cantidad-menos" onclick="cambiarCantidadCard(${p.id}, -1)">−</button>
-                        <span id="cantidad-display-${p.id}" class="cantidad-display-card">1</span>
-                        <button class="btn-cantidad-mas" onclick="cambiarCantidadCard(${p.id}, 1)">+</button>
-                    </div>
-            
-                    <button class="add-to-cart-btn"
-                        onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">
-                        Agregar
-                    </button>
-                </div>
-                  `;
-        
-        // 3. INSERTAMOS LA IMAGEN AL INICIO DE LA TARJETA
-        card.prepend(imgElement);
-
-        cont.appendChild(card);
-    });
+    let precioHTML = "";
+    if (p.precio_anterior && p.precio_anterior > p.precio) {
+      const descuento = Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100);
+      precioHTML = `
+        <p style="margin: 5px 0; text-align:center;">
+          <span style="text-decoration: line-through; color: #888; font-size: 13px;">$${p.precio_anterior.toFixed(2)}</span><br>
+          <span style="color: #e74c3c; font-weight: bold; font-size: 15px;">$${p.precio.toFixed(2)}</span>
+          <span style="color:#27ae60; font-size:13px; font-weight:bold;">(-${descuento}%)</span>
+        </p>`;
+    } else {
+      precioHTML = `<p style="color: #e74c3c; font-weight: bold;">$${p.precio.toFixed(2)}</p>`;
+    }
+    
+    const imgElement = document.createElement('img');
+    imgElement.src = imgURL;
+    imgElement.alt = nombreEscapado;
+    imgElement.style.cursor = 'zoom-in';
+    imgElement.addEventListener('click', () => abrirModalImagen(imgURL));
+    
+    card.innerHTML = `
+      <h3>${p.nombre}</h3>
+      <span style="font-size: 12px; font-weight: bold; color: ${stockColor}; margin-bottom: 5px;">${stockText}</span>
+      ${precioHTML}
+      <div style="display:flex; flex-direction:column; gap: 8px; width: 100%; margin: 5px 0 10px 0;">
+        <div id="controls-container-${p.id}" class="quantity-controls-card">
+          <button class="btn-cantidad-menos" onclick="cambiarCantidadCard(${p.id}, -1)">−</button>
+          <span id="cantidad-display-${p.id}" class="cantidad-display-card">1</span>
+          <button class="btn-cantidad-mas" onclick="cambiarCantidadCard(${p.id}, 1)">+</button>
+        </div>
+        <button class="add-to-cart-btn" onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">Agregar</button>
+      </div>`;
+    
+    card.prepend(imgElement);
+    cont.appendChild(card);
+  });
 }
 
-
-
-
-// ================== CONTROLADOR DE CANTIDAD EN LA TARJETA (NUEVO) ==================
 function cambiarCantidadCard(id, cambio) {
-  // El ID ahora apunta al <span> que muestra la cantidad
-  const display = document.getElementById(`cantidad-display-${id}`);
-  if (!display) return;
-  
-  let cantidadActual = parseInt(display.textContent, 10);
-  let nuevaCantidad = cantidadActual + cambio;
-
-  // No permitir cantidades menores a 1
-  if (nuevaCantidad < 1) {
-    nuevaCantidad = 1;
-  }
-
-  display.textContent = nuevaCantidad;
+  const display = document.getElementById(`cantidad-display-${id}`);
+  if (!display) return;
+  let cantidadActual = parseInt(display.textContent, 10);
+  let nuevaCantidad = cantidadActual + cambio;
+  if (nuevaCantidad < 1) nuevaCantidad = 1;
+  display.textContent = nuevaCantidad;
 }
 
-
-// ================== FUNCIÓN DE AGREGAR AL CARRITO (LECTOR DE CANTIDAD) ==================
 function agregarAlCarritoDesdeCard(id, nombre, precio, precio_anterior) {
-  // Obtener el valor del <span> de cantidad específico
-  const cantidadDisplay = document.getElementById(`cantidad-display-${id}`);
-  let cantidad = parseInt(cantidadDisplay.textContent, 10); // Lee el contenido del span
+  const cantidadDisplay = document.getElementById(`cantidad-display-${id}`);
+  let cantidad = parseInt(cantidadDisplay.textContent, 10);
+  if (isNaN(cantidad) || cantidad <= 0) cantidad = 1;
 
-  // Si por alguna razón la cantidad es inválida, se establece en 1
-  if (isNaN(cantidad) || cantidad <= 0) {
-    cantidad = 1;
-  }
-
-  // ✅ Llamar a la función del carrito con la cantidad especificada (el 5º parámetro)
-  carritoLista(id, nombre, precio, precio_anterior, cantidad);
-  
-  // Opcional: Reiniciar la cantidad en la tarjeta a 1 después de agregar
-  cantidadDisplay.textContent = 1;
+  carritoLista(id, nombre, precio, precio_anterior, cantidad);
+  cantidadDisplay.textContent = 1;
 }
 
-
-// ================== CARRITO LISTA (CON VALOR POR DEFECTO) ==================
-// Asegúrate de que tenga 5 parámetros, con el último en 1 por defecto.
 function carritoLista(id, nombre, precio, precio_anterior = null, cantidadAAgregar = 1) { 
-  const index = pedidoTemp.findIndex(item => item.id === id);
-  
-  if (index !== -1) {
-    // Si existe, suma la cantidad (la línea 811 debe estar por aquí)
-    pedidoTemp[index].cantidad += cantidadAAgregar; // <<-- Usa el parámetro
-  } else {
-    // Si no existe, agrega el nuevo producto con la cantidad
-    pedidoTemp.push({ id, nombre, precio, precio_anterior, cantidad: cantidadAAgregar });
-  }
-  renderCarritoCliente();
+  const index = pedidoTemp.findIndex(item => item.id === id);
+  if (index !== -1) {
+    pedidoTemp[index].cantidad += cantidadAAgregar;
+  } else {
+    pedidoTemp.push({ id, nombre, precio, precio_anterior, cantidad: cantidadAAgregar });
+  }
+  renderCarritoCliente();
 }
-
-
 
 function modificarCantidad(id, cambio) {
   const producto = pedidoTemp.find(p => p.id === id);
   if (!producto) return;
   producto.cantidad += cambio;
   if (producto.cantidad <= 0) pedidoTemp = pedidoTemp.filter(p => p.id !== id);
-  renderCarritoCliente();
-}
-
-function eliminarDelCarrito(id) {
-  pedidoTemp = pedidoTemp.filter(p => p.id !== id);
   renderCarritoCliente();
 }
 
@@ -850,23 +744,16 @@ function renderCarritoCliente() {
   }
 
   contenedor.innerHTML = pedidoTemp.map(p => `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;padding:10px;border:1px solid #ccc;border-radius:10px; background:#fff; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
-      
-      <!-- Nombre del producto -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;padding:10px;border:1px solid #ccc;border-radius:10px; background:#fff;">
       <div style="flex:1; font-weight:bold; color:#333;">${p.nombre}</div>
-      
-      <!-- Controles de cantidad -->
       <div style="display:flex; align-items:center; gap:6px; border:1px solid #ddd; border-radius:6px; padding:2px 4px;">
         <button onclick="modificarCantidad(${p.id}, -1)" style="background:#e74c3c;color:white;border:none;border-radius:4px;padding:4px 8px; cursor:pointer;">−</button>
         <span style="min-width:24px; text-align:center;">${p.cantidad}</span>
         <button onclick="modificarCantidad(${p.id}, 1)" style="background:#27ae60;color:white;border:none;border-radius:4px;padding:4px 8px; cursor:pointer;">+</button>
       </div>
-
-      <!-- Subtotal -->
       <div style="width:70px; text-align:right; font-weight:bold; color:#e74c3c;">
         $${(p.precio * p.cantidad).toFixed(2)}
       </div>
-      
     </div>
   `).join("");
 
@@ -875,65 +762,36 @@ function renderCarritoCliente() {
   document.getElementById("carritoCount").textContent = pedidoTemp.reduce((sum, p) => sum + p.cantidad, 0);
 }
 
-
-
+// ================== CONSULTA PEDIDOS DNI ==================
 async function consultarPedidosCliente() {
   const dni = document.getElementById("dni").value.trim();
-
-  if (!dni) {
-    alert("Ingrese el DNI para consultar su pedido.");
-    return;
-  }
+  if (!dni) { alert("Ingrese el DNI."); return; }
 
   try {
-    // 💡 MODIFICACIÓN 1: Incluir 'estado' en la selección
-    const { data: pedidos, error } = await sb.from("pedidos")
+    const { data: pedidos, error } = await sb
+      .from("pedidos")
       .select("id, created_at, total, productos, cliente, estado") 
       .ilike("dni", `%${dni}%`)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
     if (!pedidos || pedidos.length === 0) {
-      alert("No se encontró ningún pedido con ese DNI.");
-      pedidoExistenteId = null;
+      alert("No se encontró ningún pedido.");
       return;
     }
 
-    // Crear modal de selección
     const modal = document.createElement("div");
     modal.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:2000;";
     const contenido = document.createElement("div");
     contenido.style = "background:white;padding:20px;border-radius:12px;max-width:400px;width:90%;text-align:left; max-height:80vh; overflow-y:auto;";
-    contenido.innerHTML = `
-      <h3>Pedidos encontrados para DNI ${dni}:</h3>
-      <p style="font-size:12px; color:#777; margin-top:-10px;">Seleccione un pedido para cargarlo en el carrito.</p>
-    `;
+    contenido.innerHTML = `<h3>Pedidos encontrados:</h3>`;
 
     pedidos.forEach(p => {
       const fecha = new Date(p.created_at).toLocaleString("es-AR");
-      // 💡 MODIFICACIÓN 2: Determinar el texto del estado
       const estadoTexto = p.estado === 'archivado' ? '🔴 ARCHIVADO' : '🟢 ACTIVO';
-
       const btn = document.createElement("button");
-      // Ajuste de estilo para que sea más informativo y visual
-      btn.style = `
-        display:block;
-        width:100%;
-        margin:8px 0;
-        padding:12px;
-        border:1px solid #ccc;
-        border-radius:8px;
-        cursor:pointer;
-        font-size:14px;
-        text-align:left;
-        background-color: ${p.estado === 'archivado' ? '#f7dbdb' : '#e0f7e9'};
-        color: #333;
-        transition: background-color 0.2s;
-      `;
-      btn.textContent = `[${estadoTexto}] - ${fecha} - Pedido #${p.id} - ${p.cliente} ($${p.total.toFixed(2)})`;
-      
-      btn.onmouseover = () => btn.style.backgroundColor = p.estado === 'archivado' ? '#f5c8c8' : '#c8e6c9';
-      btn.onmouseout = () => btn.style.backgroundColor = p.estado === 'archivado' ? '#f7dbdb' : '#e0f7e9';
+      btn.style = `display:block;width:100%;margin:8px 0;padding:12px;border:1px solid #ccc;border-radius:8px;cursor:pointer;background-color:${p.estado === 'archivado' ? '#f7dbdb' : '#e0f7e9'}`;
+      btn.textContent = `[${estadoTexto}] - ${fecha} - $${p.total.toFixed(2)}`;
       
       btn.onclick = () => {
         pedidoTemp = [];
@@ -941,11 +799,11 @@ async function consultarPedidosCliente() {
         if (Array.isArray(p.productos)) {
           p.productos.forEach(prod => {
             pedidoTemp.push({
-              id: prod.id || 0,
-              nombre: prod.nombre || "Sin nombre",
-              precio: prod.precio || 0,
-              precio_anterior: prod.precio_anterior || 0,
-              cantidad: prod.cantidad || 1
+              id: prod.id,
+              nombre: prod.nombre,
+              precio: prod.precio,
+              precio_anterior: prod.precio_anterior,
+              cantidad: prod.cantidad
             });
           });
         }
@@ -955,26 +813,21 @@ async function consultarPedidosCliente() {
       contenido.appendChild(btn);
     });
 
-    const cancelar = document.createElement("button");
-    cancelar.textContent = "Cerrar";
-    cancelar.style = "margin-top:20px;padding:12px;width:100%;background:#e74c3c;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;";
-    cancelar.onclick = () => document.body.removeChild(modal);
-    contenido.appendChild(cancelar);
-
+    const cerrar = document.createElement("button");
+    cerrar.textContent = "Cerrar";
+    cerrar.style = "margin-top:20px;padding:12px;width:100%;background:#e74c3c;color:white;border:none;border-radius:8px;";
+    cerrar.onclick = () => document.body.removeChild(modal);
+    contenido.appendChild(cerrar);
     modal.appendChild(contenido);
     document.body.appendChild(modal);
 
   } catch (err) {
     console.error(err);
-    alert("Ocurrió un error al consultar los pedidos por DNI.");
+    alert("Error al consultar pedidos.");
   }
 }
 
-
-
-// ================================================
-// CONFIRMAR Y GUARDAR PEDIDO
-// ================================================
+// ================== CONFIRMAR PEDIDO ==================
 async function confirmarPedido() {
   if (!document.getElementById("clienteNombre").value || !document.getElementById("clienteLocalidad").value) {
     alert("Complete el nombre y la localidad");
@@ -982,7 +835,7 @@ async function confirmarPedido() {
   }
 
   if (pedidoTemp.length === 0) {
-    alert("No hay productos para enviar");
+    alert("No hay productos seleccionados");
     return;
   }
 
@@ -992,14 +845,15 @@ async function confirmarPedido() {
   const dni = document.getElementById("dni").value.trim();
 
   try {
-    // 1. Guardar o actualizar el pedido
     if (pedidoExistenteId) {
-      const { error } = await sb.from("pedidos")
+      const { error } = await sb
+        .from("pedidos")
         .update({ dni: dni, total: totalCalculado, productos: pedidoTemp })
         .eq("id", pedidoExistenteId);
       if (error) throw error;
     } else {
-      const { data, error } = await sb.from("pedidos")
+      const { data, error } = await sb
+        .from("pedidos")
         .insert([{
           cliente: nombreCliente,
           dni: dni,
@@ -1013,27 +867,18 @@ async function confirmarPedido() {
       pedidoExistenteId = data[0].id;
     }
 
-    // ========================================================
-    // NUEVO: DESCONTAR STOCK DE CADA PRODUCTO
-    // ========================================================
     for (const prod of pedidoTemp) {
-      const { error: errorStock } = await sb.rpc('descontar_stock', {
+      await sb.rpc('descontar_stock', {
         producto_id: prod.id,
         cantidad_a_descontar: prod.cantidad
       });
-      
-      if (errorStock) {
-        console.error(`Error descontando stock para ID ${prod.id}:`, errorStock);
-      }
     }
-    // ========================================================
 
-    // Mostrar modal de PDF
     document.getElementById("modalPDF").style.display = "flex";
 
   } catch (err) {
     console.error(err);
-    alert("Ocurrió un error al procesar el pedido.");
+    alert("Error al procesar el pedido.");
   }
 }
 
@@ -1049,13 +894,15 @@ function reiniciarPedido() {
   document.getElementById("carritoTotal").textContent = "$0.00";
   document.getElementById("carritoCount").textContent = "0";
   window.scrollTo({ top: 0, behavior: "smooth" });
-  pedidoExistenteId = null; // opcional: reinicia pedido existente
+  pedidoExistenteId = null;
 }
 
+function cerrarModalPDF() {
+  document.getElementById("modalPDF").style.display = "none";
+  reiniciarPedido();
+}
 
-// ================================================
-// GENERAR PDF
-// ================================================
+// ================== GENERAR PDF ==================
 async function descargarPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
@@ -1064,32 +911,23 @@ async function descargarPDF() {
   const selectLocalidad = document.getElementById("clienteLocalidad");
   const localidad = (selectLocalidad.options[selectLocalidad.selectedIndex]?.text || "Sin localidad").trim();
   const fecha = new Date().toLocaleString("es-AR");
-const dni = (document.getElementById("dni").value || "").trim() || "Sin DNI";
+  const dni = (document.getElementById("dni").value || "").trim() || "Sin DNI";
 
-  if (!pedidoTemp || pedidoTemp.length === 0) {
-    alert("No hay productos para generar PDF.");
-    return;
-  }
-
-  // Preparar productos, subtotal y ahorro total
   let ahorroTotal = 0;
   const productos = pedidoTemp.map(p => {
     const subtotal = p.precio * p.cantidad;
-    let ahorro = 0;
     if (p.precio_anterior && p.precio_anterior > p.precio) {
-      ahorro = (p.precio_anterior - p.precio) * p.cantidad;
-      ahorroTotal += ahorro;
+      ahorroTotal += (p.precio_anterior - p.precio) * p.cantidad;
     }
     return [
-      p.nombre || "Sin nombre",
-      p.cantidad || 0,
-      p.precio_anterior && p.precio_anterior > p.precio ? `$${p.precio_anterior.toFixed(2)}` : "-",
+      p.nombre,
+      p.cantidad,
+      p.precio_anterior ? `$${p.precio_anterior.toFixed(2)}` : "-",
       `$${p.precio.toFixed(2)}`,
       `$${subtotal.toFixed(2)}`
     ];
   });
 
-  // Cargar logo
   const logoURL = "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
   const img = new Image();
   img.crossOrigin = "anonymous";
@@ -1097,140 +935,45 @@ const dni = (document.getElementById("dni").value || "").trim() || "Sin DNI";
 
   img.onload = () => {
     const pageWidth = doc.internal.pageSize.getWidth();
-    const logoWidth = 110;
-    const logoHeight = 35;
-    const logoX = (pageWidth - logoWidth) / 2; // centrar horizontalmente
-    doc.addImage(img, 'PNG', logoX, 10, logoWidth, logoHeight);
-
-    // Encabezado
+    doc.addImage(img, 'PNG', (pageWidth - 110) / 2, 10, 110, 35);
     doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
     doc.text("Pedido Realizado", pageWidth / 2, 45, { align: "center" });
-
-    // Datos del pedido
     doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
     doc.text(`Cliente: ${nombreCliente}`, 10, 60);
     doc.text(`DNI: ${dni}`, 10, 68);
     doc.text(`Localidad: ${localidad}`, 10, 76);
     doc.text(`Fecha: ${fecha}`, 10, 84);
 
-    // Tabla de productos
     doc.autoTable({
       startY: 92,
-      head: [["Producto", "Cantidad", "Precio Ant.", "Precio Actual", "Subtotal"]],
+      head: [["Producto", "Cant.", "P. Ant.", "P. Act.", "Subtotal"]],
       body: productos,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: "bold" },
-      columnStyles: {
-        0: { cellWidth: 70 },
-        1: { cellWidth: 20, halign: "center" },
-        2: { cellWidth: 30, halign: "right" },
-        3: { cellWidth: 30, halign: "right" },
-        4: { cellWidth: 30, halign: "right" },
-      },
-      margin: { left: 10, right: 10 }
+      styles: { fontSize: 10 }
     });
 
-    // Total final
-    const total = pedidoTemp.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
-    const finalY = doc.lastAutoTable?.finalY || 85;
+    const finalY = doc.lastAutoTable.finalY || 100;
     doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total: $${total.toFixed(2)}`, 150, finalY + 12);
-
-    // Ahorro
+    doc.text(`Total: $${pedidoTemp.reduce((acc, p) => acc + p.precio * p.cantidad, 0).toFixed(2)}`, 150, finalY + 12);
+    
     if (ahorroTotal > 0) {
-      doc.setFontSize(14);
       doc.setTextColor(0, 128, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text(`Usted ahorró comprando promociones un total de: $${ahorroTotal.toFixed(2)}`, 10, finalY + 30);
-      doc.setTextColor(0, 0, 0);
+      doc.text(`Ahorro total: $${ahorroTotal.toFixed(2)}`, 10, finalY + 30);
     }
 
-    const safeName = nombreCliente.replace(/[^a-z0-9]/gi, '_');
-    doc.save(`pedido-${safeName}.pdf`);
-
-    document.getElementById("modalPDF").style.display = "none";
-    reiniciarPedido();
-  };
-
-  img.onerror = () => {
-    console.warn("No se pudo cargar el logo. PDF se generará sin logo.");
-
-    // Encabezado sin logo
-    const pageWidth = doc.internal.pageSize.getWidth();
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("Distribuidora Allana - Pedido de Cliente", pageWidth / 2, 20, { align: "center" });
-
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Cliente: ${nombreCliente}`, 10, 35);
-    doc.text(`DNI: ${dni}`, 10, 43);
-    doc.text(`Localidad: ${localidad}`, 10, 43);
-    doc.text(`Fecha: ${fecha}`, 10, 51);
-
-    doc.autoTable({
-      startY: 55,
-      head: [["Producto", "Cantidad", "Precio Ant.", "Precio Actual", "Subtotal"]],
-      body: productos,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: "bold" },
-      columnStyles: {
-        0: { cellWidth: 70 },
-        1: { cellWidth: 20, halign: "center" },
-        2: { cellWidth: 30, halign: "right" },
-        3: { cellWidth: 30, halign: "right" },
-        4: { cellWidth: 30, halign: "right" },
-      },
-      margin: { left: 10, right: 10 }
-    });
-
-    const total = pedidoTemp.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
-    const finalY = doc.lastAutoTable?.finalY || 55;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total: $${total.toFixed(2)}`, 10, finalY + 12);
-
-    if (ahorroTotal > 0) {
-      doc.setFontSize(12);
-      doc.setTextColor(0, 128, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text(`Ahorro por promociones: $${ahorroTotal.toFixed(2)}`, 10, finalY + 20);
-      doc.setTextColor(0, 0, 0);
-    }
-
-    const safeName = nombreCliente.replace(/[^a-z0-9]/gi, '_');
-    doc.save(`pedido-${safeName}.pdf`);
-    document.getElementById("modalPDF").style.display = "none";
-    reiniciarPedido();
+    doc.save(`pedido-${nombreCliente.replace(/\s+/g, '_')}.pdf`);
+    cerrarModalPDF();
   };
 }
-
-
-
-// ================== CERRAR MODAL AL CLIC FUERA (NUEVO) ==================
-
-// Obtener el elemento modal
-const modalImagen = document.getElementById('modalImagen');
-
-// Añadir listener para cerrar al hacer clic en el fondo
-modalImagen.addEventListener('click', function(event) {
-  // Si el clic ocurrió directamente en el elemento modal (el fondo oscuro),
-  // y no en su contenido interno (.modal-content-img), cerramos el modal.
-  if (event.target === modalImagen) {
-    cerrarModalImagen();
-  }
-});
-
-
-
 
 // ================== INICIALIZACIÓN ==================
 window.addEventListener("DOMContentLoaded", () => {
   cargarCategorias();
   cargarLocalidades();
+});
+
+// Listener para cerrar modal imagen al click fuera
+document.getElementById('modalImagen').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalImagen();
 });
 </script>
 </body>
