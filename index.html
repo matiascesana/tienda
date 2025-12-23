@@ -1003,13 +1003,15 @@ async function confirmarPedido() {
   const dni = document.getElementById("dni").value.trim();
 
   try {
-    // 1. Guardar o actualizar el pedido
+    // 1. Guardar o actualizar el pedido en la tabla 'pedidos'
+    let pedidoId;
     if (pedidoExistenteId) {
       const { error } = await supabase
         .from("pedidos")
         .update({ dni: dni, total: totalCalculado, productos: pedidoTemp })
         .eq("id", pedidoExistenteId);
       if (error) throw error;
+      pedidoId = pedidoExistenteId;
     } else {
       const { data, error } = await supabase
         .from("pedidos")
@@ -1023,25 +1025,28 @@ async function confirmarPedido() {
         }])
         .select();
       if (error) throw error;
-      pedidoExistenteId = data[0].id;
+      pedidoId = data[0].id;
+      pedidoExistenteId = pedidoId;
     }
 
     // ========================================================
-    // NUEVO: DESCONTAR STOCK DE CADA PRODUCTO
+    // NUEVO: LOGICA PARA DESCONTAR EL STOCK
     // ========================================================
-    for (const prod of pedidoTemp) {
+    // Recorremos cada producto que está en el carrito (pedidoTemp)
+    for (const item of pedidoTemp) {
       const { error: errorStock } = await supabase.rpc('descontar_stock', {
-        producto_id: prod.id,
-        cantidad_a_descontar: prod.cantidad
+        producto_id: item.id,
+        cantidad_a_descontar: item.cantidad
       });
-      
+
       if (errorStock) {
-        console.error(`Error descontando stock para ID ${prod.id}:`, errorStock);
+        console.error(`Error al descontar stock del producto ${item.id}:`, errorStock);
+        // Opcional: podrías avisar al usuario si un producto no tiene suficiente stock
       }
     }
     // ========================================================
 
-    // Mostrar modal de PDF
+    // Mostrar modal de éxito y PDF
     document.getElementById("modalPDF").style.display = "flex";
 
   } catch (err) {
