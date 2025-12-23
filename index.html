@@ -479,18 +479,11 @@
 
 <script>
 
-// Usamos un nombre diferente para la instancia (supabaseClient) 
-// para evitar conflictos con el objeto global 'window.supabase' de la librería.
-const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
+const URL_DB = "https://ejbqlejlgprvwzrptojo.supabase.co";
+const KEY_DB = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
 
-// Opción ultra-segura: solo declarar si no existe
-if (typeof supabaseClient === 'undefined') {
-    window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-}
-
-// Para que el resto de tu código siga funcionando sin cambiar nada:
-var supabase = window.supabaseClient;
+// Usamos 'sb' para evitar conflictos con el objeto global 'supabase' de la CDN
+const sb = window.supabase.createClient(URL_DB, KEY_DB);
 
 
 let carritoCliente = [];
@@ -501,8 +494,7 @@ let pedidoExistenteId = null;
 // ================== CARGA CATEGORÍAS ==================
 async function cargarCategorias() {
   // Usamos .order('nombre', { ascending: true }) para ordenar alfabéticamente
-  const { data, error } = await supabase
-    .from("categorias")
+  const { data, error } = await sb.from("categorias")
     .select("*")
     .order("nombre", { ascending: true }); // A-Z
 
@@ -539,8 +531,7 @@ async function buscarClientePorNombre() {
   try {
     // Buscamos en la tabla 'pedidos' que es donde se guarda el historial del cliente.
     // Hacemos un "ilike" (case-insensitive search) en el campo 'cliente'.
-    const { data: pedidos, error } = await supabase
-      .from("pedidos")
+    const { data: pedidos, error } = await sb.from("pedidos")
       .select("cliente, dni, localidad_id")
       .ilike("cliente", `%${nombreBusqueda}%`)
       .limit(20); // Limitamos la búsqueda a 20 resultados para no sobrecargar
@@ -614,7 +605,7 @@ async function buscarClientePorNombre() {
 
 // ================== CARGA LOCALIDADES ==================
 async function cargarLocalidades() {
-  const { data, error } = await supabase.from("localidades").select("*").order("nombre", { ascending: true });
+  const { data, error } = await sb.from("localidades").select("*").order("nombre", { ascending: true });
   if (error) return console.error(error);
   const select = document.getElementById("clienteLocalidad");
   select.innerHTML = '<option value="">Seleccionar localidad...</option>';
@@ -646,8 +637,7 @@ async function cargarPromosPorCategoria() {
   cont.innerHTML = "";
   if (!catId) return;
 
-  const { data: promos, error } = await supabase
-    .from("promociones")
+  const { data: promos, error } = await sb.from("promociones")
     .select("*")
     .eq("categoria_id", catId);
 
@@ -680,7 +670,7 @@ document.getElementById("busquedaPromo").addEventListener("input", async (e) => 
     return;
   }
 
-  let query = supabase.from("promociones").select("*");
+  let query = sb.from("promociones").select("*");
   if (catId) query = query.eq("categoria_id", catId);
   if (texto.length > 0) query = query.ilike("nombre", `%${texto}%`);
 
@@ -897,8 +887,7 @@ async function consultarPedidosCliente() {
 
   try {
     // 💡 MODIFICACIÓN 1: Incluir 'estado' en la selección
-    const { data: pedidos, error } = await supabase
-      .from("pedidos")
+    const { data: pedidos, error } = await sb.from("pedidos")
       .select("id, created_at, total, productos, cliente, estado") 
       .ilike("dni", `%${dni}%`)
       .order("created_at", { ascending: false });
@@ -1005,14 +994,12 @@ async function confirmarPedido() {
   try {
     // 1. Guardar o actualizar el pedido
     if (pedidoExistenteId) {
-      const { error } = await supabase
-        .from("pedidos")
+      const { error } = await sb.from("pedidos")
         .update({ dni: dni, total: totalCalculado, productos: pedidoTemp })
         .eq("id", pedidoExistenteId);
       if (error) throw error;
     } else {
-      const { data, error } = await supabase
-        .from("pedidos")
+      const { data, error } = await sb.from("pedidos")
         .insert([{
           cliente: nombreCliente,
           dni: dni,
@@ -1030,7 +1017,7 @@ async function confirmarPedido() {
     // NUEVO: DESCONTAR STOCK DE CADA PRODUCTO
     // ========================================================
     for (const prod of pedidoTemp) {
-      const { error: errorStock } = await supabase.rpc('descontar_stock', {
+      const { error: errorStock } = await sb.rpc('descontar_stock', {
         producto_id: prod.id,
         cantidad_a_descontar: prod.cantidad
       });
