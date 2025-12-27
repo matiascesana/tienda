@@ -381,6 +381,32 @@
   .add-to-cart-btn:hover {
     background: #1e8449;
   }
+
+.item-control {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  gap: 15px;
+}
+
+.item-control input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.item-control label {
+  flex: 1;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.item-control.checked {
+  background-color: #f0fdf4;
+  color: #888;
+  text-decoration: line-through;
+}  
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -435,11 +461,35 @@
 
 <div id="modalPDF">
   <div class="modal-content">
-    <p>✅ Pedido enviado correctamente. ¿Desea descargar el PDF con el detalle del pedido?</p>
-    <button onclick="cerrarModalPDF()">No</button>
-    <button onclick="descargarPDF()">Sí</button>
+    <p>✅ Pedido enviado correctamente.</p>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <button onclick="abrirControlPedido()" style="background:#3498db; color:white;">🔍 Ver y controlar el pedido</button>
+      <div style="display: flex; justify-content: center; gap: 10px;">
+        <button onclick="cerrarModalPDF()" style="background:#e74c3c; color:white;">Cerrar</button>
+        <button onclick="descargarPDF()" style="background:#27ae60; color:white;">Descargar PDF directo</button>
+      </div>
+    </div>
   </div>
 </div>
+
+<div id="modalControlPedido" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:3000; padding: 15px;">
+  <div class="modal-content" style="background: white; padding: 25px; border-radius: 14px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;">
+    <h2 style="margin-top:0;">📋 Control de Preparación</h2>
+    <p style="font-size: 14px; color: #555;">Marque los productos a medida que los separa:</p>
+    <hr>
+    <div id="listaControlCheck" style="text-align: left; margin: 20px 0;">
+      </div>
+    <hr>
+    <div id="contenedorBotonesControl" style="display: flex; flex-direction: column; gap: 10px;">
+        <button id="btnFinalizarControl" disabled onclick="descargarPDFDesdeControl()" style="background:#ccc; color:white; padding: 15px; border-radius: 10px; border:none; font-weight:bold; cursor: not-allowed; font-size: 16px;">
+            FINALIZAR Y DESCARGAR PDF
+        </button>
+        <button onclick="cerrarControlPedido()" style="background:none; border:none; color:#e74c3c; cursor:pointer; text-decoration: underline;">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+  
 
 <div id="modalImagen">
   <div class="modal-content-img">
@@ -902,6 +952,73 @@ function cerrarModalPDF() {
   reiniciarPedido();
 }
 
+
+// Función para abrir el modal de checklist
+function abrirControlPedido() {
+  document.getElementById("modalPDF").style.display = "none";
+  const modalControl = document.getElementById("modalControlPedido");
+  const contenedor = document.getElementById("listaControlCheck");
+  
+  contenedor.innerHTML = ""; // Limpiar contenido previo
+
+  pedidoTemp.forEach((prod, index) => {
+    const div = document.createElement("div");
+    div.className = "item-control";
+    div.innerHTML = `
+      <input type="checkbox" id="check-${index}" class="check-preparacion" onchange="validarChecklist()">
+      <label for="check-${index}">
+        <strong>${prod.cantidad}x</strong> ${prod.nombre}
+      </label>
+    `;
+    contenedor.appendChild(div);
+  });
+
+  modalControl.style.display = "flex";
+  validarChecklist(); // Inicializar estado del botón
+}
+
+// Función para validar si todos los productos están marcados
+function validarChecklist() {
+  const checkboxes = document.querySelectorAll(".check-preparacion");
+  const btnFinalizar = document.getElementById("btnFinalizarControl");
+  const todosMarcados = Array.from(checkboxes).every(cb => cb.checked);
+
+  // Aplicar estilo visual a las filas marcadas
+  checkboxes.forEach(cb => {
+    if (cb.checked) {
+      cb.parentElement.classList.add("checked");
+    } else {
+      cb.parentElement.classList.remove("checked");
+    }
+  });
+
+  if (todosMarcados && checkboxes.length > 0) {
+    btnFinalizar.disabled = false;
+    btnFinalizar.style.background = "#27ae60";
+    btnFinalizar.style.cursor = "pointer";
+    btnFinalizar.textContent = "✅ TODO LISTO - DESCARGAR PDF";
+  } else {
+    btnFinalizar.disabled = true;
+    btnFinalizar.style.background = "#ccc";
+    btnFinalizar.style.cursor = "not-allowed";
+    btnFinalizar.textContent = "FALTAN PRODUCTOS POR MARCAR";
+  }
+}
+
+function cerrarControlPedido() {
+  document.getElementById("modalControlPedido").style.display = "none";
+  reiniciarPedido(); // Opcional: si quieres limpiar todo al cancelar
+}
+
+// Función especial para descargar y cerrar todo
+async function descargarPDFDesdeControl() {
+  await descargarPDF(); // Llama a tu función existente
+  document.getElementById("modalControlPedido").style.display = "none";
+}
+
+
+
+  
 // ================== GENERAR PDF ==================
 async function descargarPDF() {
   const { jsPDF } = window.jspdf;
