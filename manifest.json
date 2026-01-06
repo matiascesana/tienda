@@ -1,0 +1,15 @@
+{
+  "name": "Distribuidora Allana",
+  "short_name": "Allana App",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#3498db",
+  "theme_color": "#3498db",
+  "icons": [
+    {
+      "src": "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
