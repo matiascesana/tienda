@@ -516,6 +516,37 @@ let todasLasPromos = [];
 let pedidoTemp = [];
 let pedidoExistenteId = null;
 
+
+// --- PERSISTENCIA DE DATOS ---
+function guardarEstadoLocal() {
+  const estado = {
+    pedidoTemp: pedidoTemp,
+    clienteNombre: document.getElementById("clienteNombre").value,
+    dni: document.getElementById("dni").value,
+    clienteLocalidad: document.getElementById("clienteLocalidad").value,
+    pedidoExistenteId: pedidoExistenteId
+  };
+  localStorage.setItem("pedido_respaldo", JSON.stringify(estado));
+}
+
+  function cargarEstadoLocal() {
+  const guardado = localStorage.getItem("pedido_respaldo");
+  if (guardado) {
+    const datos = JSON.parse(guardado);
+    
+    // Restaurar variables
+    pedidoTemp = datos.pedidoTemp || [];
+    pedidoExistenteId = datos.pedidoExistenteId || null;
+    
+    // Restaurar inputs (si existen en el DOM)
+    if(datos.clienteNombre) document.getElementById("clienteNombre").value = datos.clienteNombre;
+    if(datos.dni) document.getElementById("dni").value = datos.dni;
+    if(datos.clienteLocalidad) document.getElementById("clienteLocalidad").value = datos.clienteLocalidad;
+
+    renderCarritoCliente();
+  }
+}
+  
 // ================== CARGA CATEGORÍAS ==================
 async function cargarCategorias() {
   const { data, error } = await sb
@@ -1084,15 +1115,30 @@ async function descargarPDF() {
 }
 
 // ================== INICIALIZACIÓN ==================
-window.addEventListener("DOMContentLoaded", () => {
-  cargarCategorias();
-  cargarLocalidades();
+window.addEventListener("DOMContentLoaded", async () => {
+  await cargarCategorias();
+  await cargarLocalidades();
+  cargarEstadoLocal(); // <--- Llamar a la recuperación de datos aquí
+
+  // Escuchar cambios en los inputs para guardar automáticamente
+  ["clienteNombre", "dni", "clienteLocalidad"].forEach(id => {
+    document.getElementById(id).addEventListener("input", guardarEstadoLocal);
+  });
 });
 
 // Listener para cerrar modal imagen al click fuera
 document.getElementById('modalImagen').addEventListener('click', function(e) {
   if (e.target === this) cerrarModalImagen();
 });
+
+  window.addEventListener('beforeunload', (event) => {
+  if (pedidoTemp.length > 0) {
+    event.preventDefault();
+    event.returnValue = ''; // Muestra el cuadro de diálogo estándar del navegador
+  }
+});
+
+  
 </script>
 </body>
 </html>
