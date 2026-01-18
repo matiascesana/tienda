@@ -532,18 +532,27 @@ function guardarEstadoLocal() {
   function cargarEstadoLocal() {
   const guardado = localStorage.getItem("pedido_respaldo");
   if (guardado) {
-    const datos = JSON.parse(guardado);
-    
-    // Restaurar variables
-    pedidoTemp = datos.pedidoTemp || [];
-    pedidoExistenteId = datos.pedidoExistenteId || null;
-    
-    // Restaurar inputs (si existen en el DOM)
-    if(datos.clienteNombre) document.getElementById("clienteNombre").value = datos.clienteNombre;
-    if(datos.dni) document.getElementById("dni").value = datos.dni;
-    if(datos.clienteLocalidad) document.getElementById("clienteLocalidad").value = datos.clienteLocalidad;
+    try {
+      const datos = JSON.parse(guardado);
+      
+      // Recuperar productos
+      pedidoTemp = datos.pedidoTemp || [];
+      pedidoExistenteId = datos.pedidoExistenteId || null;
+      
+      // Recuperar textos
+      if(datos.clienteNombre) document.getElementById("clienteNombre").value = datos.clienteNombre;
+      if(datos.dni) document.getElementById("dni").value = datos.dni;
+      
+      // Para la localidad, esperamos un poco a que cargue el select de la base de datos
+      setTimeout(() => {
+        if(datos.clienteLocalidad) document.getElementById("clienteLocalidad").value = datos.clienteLocalidad;
+      }, 1000);
 
-    renderCarritoCliente();
+      // ¡MUY IMPORTANTE! Dibujar el carrito recuperado
+      renderCarritoCliente();
+    } catch (e) {
+      console.error("Error recuperando datos guardados", e);
+    }
   }
 }
   
@@ -822,6 +831,7 @@ function renderCarritoCliente() {
     contenedor.innerHTML = "<span style='color:#888;'>🛒 No hay productos seleccionados</span>";
     document.getElementById("carritoTotal").textContent = "$0.00";
     document.getElementById("carritoCount").textContent = "0";
+    guardarEstadoLocal();
     return;
   }
 
@@ -842,6 +852,7 @@ function renderCarritoCliente() {
   const total = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
   document.getElementById("carritoTotal").textContent = `$${total.toFixed(2)}`;
   document.getElementById("carritoCount").textContent = pedidoTemp.reduce((sum, p) => sum + p.cantidad, 0);
+  guardarEstadoLocal();
 }
 
 // ================== CONSULTA PEDIDOS DNI ==================
@@ -965,8 +976,8 @@ async function confirmarPedido() {
 }
 
 function reiniciarPedido() {
+localStorage.removeItem("pedido_respaldo");
   pedidoTemp = [];
-  renderCarritoCliente();
   document.getElementById("clienteNombre").value = "";
   document.getElementById("dni").value = "";
   document.getElementById("clienteLocalidad").value = "";
@@ -977,7 +988,9 @@ function reiniciarPedido() {
   document.getElementById("carritoCount").textContent = "0";
   window.scrollTo({ top: 0, behavior: "smooth" });
   pedidoExistenteId = null;
+renderCarritoCliente();
 }
+
 
 function cerrarModalPDF() {
   document.getElementById("modalPDF").style.display = "none";
