@@ -408,6 +408,47 @@
   color: #888;
   text-decoration: line-through;
 }  
+
+
+/* Estilos para el Carrusel */
+.categoria-seccion {
+  margin-bottom: 30px;
+  width: 100%;
+}
+
+.categoria-titulo {
+  font-size: 20px;
+  color: #2c3e50;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 5px;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+}
+
+.carousel-wrapper {
+  display: flex;
+  overflow-x: auto;
+  gap: 15px;
+  padding: 10px 5px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch; /* Suavidad en móviles */
+}
+
+/* Ocultar barra de scroll pero mantener funcionalidad */
+.carousel-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.carousel-wrapper::-webkit-scrollbar-thumb {
+  background: #bdc3c7;
+  border-radius: 10px;
+}
+
+.promo-card {
+  flex: 0 0 auto; /* Evita que las tarjetas se encojan */
+  width: 200px;   /* Ancho fijo para el carrusel */
+}
+
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -427,7 +468,8 @@
   <hr>
   <p><b>Total:</b> <span id="carritoTotal">$0.00</span></p>
 
-  <h3>Datos del Cliente</h3>
+  
+<h3>Datos del Cliente</h3>
   <div style="display:flex;gap:10px; flex-wrap:wrap;">
     <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required style="flex:1;">
     <button onclick="buscarClientePorNombre()" id="buscarClienteBtn" style="background:#f39c12; color:white; border:none; border-radius:8px; padding:12px 16px; margin-top:12px; cursor:pointer;">Buscar Cliente</button>
@@ -441,6 +483,10 @@
   <select id="clienteLocalidad" required>
     <option value="">Seleccionar localidad...</option>
   </select>
+
+<button type="button" onclick="crearVisitaSinVenta()" style="background: #e67e22; color: white; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px;">
+    🚶‍♂️ Cliente Visitado sin Ventas (Solo Cobranza)
+</button>
 
   <button class="btn-confirmar" onclick="confirmarPedido()">Confirmar y Enviar Pedido</button>
   <hr>
@@ -465,6 +511,10 @@
     <p>✅ Pedido enviado correctamente.</p>
     <div style="display: flex; flex-direction: column; gap: 10px;">
       <button onclick="abrirControlPedido()" style="background:#3498db; color:white;">🔍 Ver y controlar el pedido</button>
+      <button onclick="mostrarFormularioPago()" style="background:#f39c12; color:white; padding: 14px 22px; border-radius: 10px; border:none; cursor:pointer;">
+  💰 Registrar Pago del Cliente
+</button> 
+      
       <div style="display: flex; justify-content: center; gap: 10px;">
         <button onclick="cerrarModalPDF()" style="background:#e74c3c; color:white;">Cerrar</button>
         <button onclick="descargarPDF()" style="background:#27ae60; color:white;">Descargar PDF directo</button>
@@ -472,6 +522,7 @@
     </div>
   </div>
 </div>
+
 
 <div id="modalControlPedido" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:3000; padding: 15px;">
   <div class="modal-content" style="background: white; padding: 25px; border-radius: 14px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;">
@@ -503,6 +554,52 @@
    style="position: fixed; bottom: 20px; right: 20px; background-color: #25D366; color: white; border-radius: 50%; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; text-decoration: none; font-size: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 1000;">
   <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" style="width:60px; height:60px;">
 </a>
+
+
+<div id="modalPago" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:4000; padding: 15px;">
+  <div class="modal-content" style="background: white; padding: 25px; border-radius: 14px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;">
+    <h2 style="margin-top:0; color: #2c3e50;">💰 Registrar Pagos</h2>
+    <p style="font-size: 14px; color: #666;">Cliente: <span id="pagoClienteNombreTexto" style="font-weight: bold;"></span></p>
+    <hr>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <div style="flex: 1;">
+          <label style="font-size: 12px;">Monto:</label>
+          <input type="number" id="inputMontoIndividual" placeholder="0.00" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+        </div>
+        <div style="flex: 1;">
+          <label style="font-size: 12px;">Método:</label>
+          <select id="inputMetodoIndividual" onchange="toggleDestinatarioMulti()" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+            <option value="Efectivo">Efectivo</option>
+            <option value="Transferencia">Transferencia</option>
+          </select>
+        </div>
+      </div>
+      
+      <div id="campoDestinatarioMulti" style="display:none; margin-bottom: 10px;">
+        <label style="font-size: 12px;">Destinatario:</label>
+        <input type="text" id="inputDestinatarioIndividual" placeholder="Nombre titular cuenta" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+      </div>
+      
+      <button onclick="agregarPagoALista()" style="width: 100%; background: #3498db; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold;">+ Agregar este pago</button>
+    </div>
+
+    <div id="listaPagosAgregados" style="margin-bottom: 15px; border: 1px solid #eee; border-radius: 8px; padding: 10px; min-height: 50px;">
+      <p style="color: #999; font-size: 13px; text-align: center;">No hay pagos agregados aún</p>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <span>Total Pedido: <b id="pagoTotalPedido">$0</b></span>
+      <span>Restante: <b id="pagoRestante">$0</b></span>
+    </div>
+
+    <button onclick="procesarRegistroPagoMulti()" id="btnConfirmarPagoFinal" disabled style="width:100%; background:#ccc; color:white; padding: 15px; border-radius: 10px; border:none; font-weight:bold; cursor:not-allowed;">CONFIRMAR Y FINALIZAR</button>
+    <button onclick="cerrarModalPago()" style="width:100%; background:none; border:none; color:#e74c3c; cursor:pointer; margin-top:10px; text-decoration:underline;">Cancelar</button>
+  </div>
+</div>
+
+
 
 <script>
 // --- CONFIGURACIÓN DE SUPABASE ---
@@ -556,6 +653,57 @@ function guardarEstadoLocal() {
   }
 }
   
+async function crearVisitaSinVenta() {
+    const nombre = document.getElementById("clienteNombre").value.trim();
+    const dni = document.getElementById("dni").value.trim();
+    const localidadId = document.getElementById("clienteLocalidad").value;
+
+    if (!nombre) return alert("Ingrese el nombre del cliente para registrar la visita.");
+
+    const confirmar = confirm(`¿Registrar visita sin venta para ${nombre}? Se creará un registro para cargar el pago.`);
+    if (!confirmar) return;
+
+    // 1. Definimos el "Producto Fantasma"
+    const itemVisita = [{
+        id: "VISITA_999",
+        nombre: "CLIENTE VISITADO SIN VENTA",
+        cantidad: 1,
+        precio: 0, // El total del pedido será 0, lo que ingrese será abono
+        subtotal: 0
+    }];
+
+    try {
+        // 2. Insertamos el pedido especial en Supabase
+        const { data, error } = await sb
+            .from("pedidos")
+            .insert([{
+                cliente: nombre,
+                dni: dni,
+                localidad_id: localidadId,
+                total: 0,
+                productos: itemVisita,
+                estado: "Visita/Cobranza", // Estado especial para diferenciarlo
+                created_at: new Date().toISOString(),
+                pagos: []
+            }])
+            .select();
+
+        if (error) throw error;
+
+        // 3. Asignamos el ID generado a nuestra variable global
+        pedidoExistenteId = data[0].id;
+
+        // 4. Abrimos el modal de pagos que ya tienes configurado
+        alert("Visita registrada. Ahora cargue el pago correspondiente.");
+        mostrarFormularioPago();
+
+    } catch (e) {
+        console.error("Error al registrar visita:", e);
+        alert("No se pudo registrar la visita: " + e.message);
+    }
+}
+
+
 // ================== CARGA CATEGORÍAS ==================
 async function cargarCategorias() {
   const { data, error } = await sb
@@ -730,62 +878,68 @@ function renderPromos(promos) {
     return;
   }
 
-  promos.forEach(p => {
-    const imgURL = p.imagen
-      ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
-      : "https://via.placeholder.com/200x140?text=Sin+Imagen";
+  // 1. Agrupar promociones por nombre de categoría
+  // Usamos un objeto para agrupar: { "Lácteos": [...], "Limpieza": [...] }
+  const grupos = promos.reduce((acc, p) => {
+    // Intentamos obtener el nombre de la categoría desde el select o un campo genérico
+    const catNombre = document.querySelector(`#categoriaSelect option[value="${p.categoria_id}"]`)?.textContent || "Otras Ofertas";
+    if (!acc[catNombre]) acc[catNombre] = [];
+    acc[catNombre].push(p);
+    return acc;
+  }, {});
 
-    const card = document.createElement("div");
-    card.className = "promo-card";
-    const nombreEscapado = p.nombre.replace(/'/g, "\\'");
-    
-    const stock = p.stock || 0;
-    let stockColor = '#27ae60';
-    let stockText = `Stock: ${stock}`;
+  // 2. Iterar sobre cada grupo y crear el carrusel
+  for (const categoria in grupos) {
+    const seccion = document.createElement("div");
+    seccion.className = "categoria-seccion";
 
-    if (stock < 5 && stock > 0) {
-      stockColor = '#f39c12';
-    } else if (stock === 0) {
-      stockColor = '#e74c3c';
-      stockText = '¡AGOTADO!';
-    }
+    const titulo = document.createElement("h2");
+    titulo.className = "categoria-titulo";
+    titulo.textContent = categoria;
+    seccion.appendChild(titulo);
 
-    let precioHTML = "";
-    if (p.precio_anterior && p.precio_anterior > p.precio) {
-      const descuento = Math.round(((p.precio_anterior - p.precio) / p.precio_anterior) * 100);
-      precioHTML = `
-        <p style="margin: 5px 0; text-align:center;">
-          <span style="text-decoration: line-through; color: #888; font-size: 13px;">$${p.precio_anterior.toFixed(2)}</span><br>
-          <span style="color: #e74c3c; font-weight: bold; font-size: 15px;">$${p.precio.toFixed(2)}</span>
-          <span style="color:#27ae60; font-size:13px; font-weight:bold;">(-${descuento}%)</span>
-        </p>`;
-    } else {
-      precioHTML = `<p style="color: #e74c3c; font-weight: bold;">$${p.precio.toFixed(2)}</p>`;
-    }
-    
-    const imgElement = document.createElement('img');
-    imgElement.src = imgURL;
-    imgElement.alt = nombreEscapado;
-    imgElement.style.cursor = 'zoom-in';
-    imgElement.addEventListener('click', () => abrirModalImagen(imgURL));
-    
-    card.innerHTML = `
-      <h3>${p.nombre}</h3>
-      <span style="font-size: 12px; font-weight: bold; color: ${stockColor}; margin-bottom: 5px;">${stockText}</span>
-      ${precioHTML}
-      <div style="display:flex; flex-direction:column; gap: 8px; width: 100%; margin: 5px 0 10px 0;">
-        <div id="controls-container-${p.id}" class="quantity-controls-card">
+    const wrapper = document.createElement("div");
+    wrapper.className = "carousel-wrapper";
+
+    grupos[categoria].forEach(p => {
+      const imgURL = p.imagen
+        ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
+        : "https://via.placeholder.com/200x140?text=Sin+Imagen";
+
+      const nombreEscapado = p.nombre.replace(/'/g, "\\'");
+      const stock = p.stock || 0;
+      let stockColor = stock < 5 ? (stock === 0 ? '#e74c3c' : '#f39c12') : '#27ae60';
+      let stockText = stock === 0 ? '¡AGOTADO!' : `Stock: ${stock}`;
+
+      let precioHTML = p.precio_anterior && p.precio_anterior > p.precio 
+        ? `<p style="text-align:center;"><span style="text-decoration:line-through;color:#888;font-size:12px;">$${p.precio_anterior.toFixed(2)}</span><br>
+           <span style="color:#e74c3c;font-weight:bold;">$${p.precio.toFixed(2)}</span></p>`
+        : `<p style="color:#e74c3c;font-weight:bold;">$${p.precio.toFixed(2)}</p>`;
+
+      const card = document.createElement("div");
+      card.className = "promo-card";
+      card.innerHTML = `
+        <img src="${imgURL}" alt="${nombreEscapado}" style="cursor:zoom-in" onclick="abrirModalImagen('${imgURL}')">
+        <h3>${p.nombre}</h3>
+        <span style="font-size:11px; font-weight:bold; color:${stockColor}">${stockText}</span>
+        ${precioHTML}
+        <div class="quantity-controls-card">
           <button class="btn-cantidad-menos" onclick="cambiarCantidadCard(${p.id}, -1)">−</button>
           <span id="cantidad-display-${p.id}" class="cantidad-display-card">1</span>
           <button class="btn-cantidad-mas" onclick="cambiarCantidadCard(${p.id}, 1)">+</button>
         </div>
-        <button class="add-to-cart-btn" onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">Agregar</button>
-      </div>`;
-    
-    card.prepend(imgElement);
-    cont.appendChild(card);
-  });
+        <button class="add-to-cart-btn" style="margin-top:8px;" onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">Agregar</button>
+      `;
+      wrapper.appendChild(card);
+    });
+
+    seccion.appendChild(wrapper);
+    cont.appendChild(seccion);
+  }
 }
+
+
+
 
 function cambiarCantidadCard(id, cambio) {
   const display = document.getElementById(`cantidad-display-${id}`);
@@ -863,7 +1017,7 @@ async function consultarPedidosCliente() {
   try {
     const { data: pedidos, error } = await sb
       .from("pedidos")
-      .select("id, created_at, total, productos, cliente, estado") 
+      .select("id, created_at, total, productos, cliente, estado, pagos") 
       .ilike("dni", `%${dni}%`)
       .order("created_at", { ascending: false });
 
@@ -998,6 +1152,202 @@ function cerrarModalPDF() {
 }
 
 
+
+// ==========================================
+// VARIABLES GLOBALES Y LÓGICA DE PAGOS
+// ==========================================
+let pagosTemporales = []; // Almacena los nuevos pagos que se están cargando en el modal
+let pagosPreviosBD = [];  // Almacena los pagos que ya existían en Supabase para este pedido
+
+async function mostrarFormularioPago() {
+    const nombre = document.getElementById("clienteNombre").value.trim();
+    if (!nombre) return alert("Ingrese el nombre del cliente.");
+
+    // Verificamos que exista un pedido confirmado para poder cargarle pagos
+    if (!pedidoExistenteId) {
+        alert("Error: Debe confirmar el pedido antes de registrar pagos.");
+        return;
+    }
+
+    // Reiniciamos estados locales del modal
+    pagosTemporales = [];
+    pagosPreviosBD = [];
+    
+    document.getElementById("pagoClienteNombreTexto").innerText = nombre;
+    const total = parseFloat(document.getElementById("carritoTotal").textContent.replace('$', ''));
+    document.getElementById("pagoTotalPedido").innerText = `$${total.toFixed(2)}`;
+
+    try {
+        // 1. VERIFICACIÓN: Consultamos si ya hay pagos cargados en este pedido en la BD
+        let { data: pedidoData, error: errFetch } = await sb
+            .from("pedidos")
+            .select("pagos")
+            .eq("id", pedidoExistenteId)
+            .single();
+
+        if (errFetch) throw errFetch;
+
+        // 2. Si existen pagos previos, los guardamos para el cálculo de saldo
+        if (pedidoData && pedidoData.pagos && Array.isArray(pedidoData.pagos)) {
+            pagosPreviosBD = pedidoData.pagos;
+        }
+
+        // 3. Renderizamos el historial visual en el modal (si existe un contenedor id="historialPagosPrevios")
+        const contenedorHistorial = document.getElementById("historialPagosPrevios");
+        if (contenedorHistorial) {
+            if (pagosPreviosBD.length > 0) {
+                const totalYaPagado = pagosPreviosBD.reduce((acc, p) => acc + p.monto, 0);
+                contenedorHistorial.innerHTML = `
+                    <div style="background: #eef2f7; border-left: 4px solid #3498db; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
+                        <p style="margin:0 0 5px 0; font-weight:bold; font-size:13px; color:#2c3e50;">Pagos registrados anteriormente:</p>
+                        <ul style="margin:0; padding-left:20px; font-size:12px; color:#7f8c8d;">
+                            ${pagosPreviosBD.map(p => `<li>${p.metodo}: $${p.monto.toFixed(2)} (${new Date(p.fecha).toLocaleDateString()})</li>`).join('')}
+                        </ul>
+                        <p style="margin:5px 0 0 0; font-size:12px;"><b>Total abonado previamente: $${totalYaPagado.toFixed(2)}</b></p>
+                    </div>
+                `;
+            } else {
+                contenedorHistorial.innerHTML = `<p style="color: #999; font-size: 12px; font-style: italic; margin-bottom:15px;">No hay pagos previos en este pedido.</p>`;
+            }
+        }
+
+    } catch (e) {
+        console.error("Error al recuperar historial de pagos:", e);
+    }
+
+    actualizarVistaPagos();
+    document.getElementById("modalPDF").style.display = "none";
+    document.getElementById("modalPago").style.display = "flex";
+}
+
+function toggleDestinatarioMulti() {
+    const metodo = document.getElementById("inputMetodoIndividual").value;
+    document.getElementById("campoDestinatarioMulti").style.display = (metodo === "Transferencia") ? "block" : "none";
+}
+
+function agregarPagoALista() {
+    const monto = parseFloat(document.getElementById("inputMontoIndividual").value);
+    const metodo = document.getElementById("inputMetodoIndividual").value;
+    const destinatario = (metodo === "Transferencia") ? document.getElementById("inputDestinatarioIndividual").value : "-";
+
+    if (isNaN(monto) || monto <= 0) return alert("Ingrese un monto válido.");
+
+    pagosTemporales.push({
+        fecha: new Date().toISOString(),
+        monto: monto,
+        metodo: metodo,
+        destinatario: destinatario,
+        pedido_id: pedidoExistenteId
+    });
+
+    // Limpiar inputs
+    document.getElementById("inputMontoIndividual").value = "";
+    document.getElementById("inputDestinatarioIndividual").value = "";
+    actualizarVistaPagos();
+}
+
+function eliminarPagoDeLista(index) {
+    pagosTemporales.splice(index, 1);
+    actualizarVistaPagos();
+}
+
+function actualizarVistaPagos() {
+    const contenedor = document.getElementById("listaPagosAgregados");
+    const totalPedido = parseFloat(document.getElementById("pagoTotalPedido").innerText.replace('$', ''));
+    
+    // Lista de nuevos pagos agregados en el modal
+    if (pagosTemporales.length === 0) {
+        contenedor.innerHTML = `<p style="color: #999; font-size: 13px; text-align: center;">No hay nuevos pagos agregados</p>`;
+    } else {
+        contenedor.innerHTML = pagosTemporales.map((p, i) => `
+            <div style="display:flex; justify-content:space-between; font-size:13px; padding:5px 0; border-bottom:1px solid #eee;">
+                <span><b>${p.metodo}</b>: $${p.monto.toFixed(2)}</span>
+                <button onclick="eliminarPagoDeLista(${i})" style="color:red; border:none; background:none; cursor:pointer;">✕</button>
+            </div>
+        `).join("");
+    }
+
+    // CÁLCULO DE SALDO: Total - (Pagos previos en BD + Pagos nuevos en modal)
+  const pagadoAnterior = pagosPreviosBD.reduce((acc, p) => acc + p.monto, 0);
+const pagadoAhora = pagosTemporales.reduce((acc, p) => acc + p.monto, 0);
+
+let restante = totalPedido - (pagadoAnterior + pagadoAhora);
+
+const txtRestante = document.getElementById("pagoRestante");
+if (totalPedido === 0) {
+    // Si es una visita sin venta, mostramos el total cobrado como "Cobranza Total"
+    txtRestante.innerText = `Cobranza: $${(pagadoAnterior + pagadoAhora).toFixed(2)}`;
+    txtRestante.style.color = "blue";
+} else {
+    txtRestante.innerText = `$${restante.toFixed(2)}`;
+    txtRestante.style.color = restante <= 0 ? "green" : "red";
+}
+
+    // Habilitar botón solo si hay nuevos pagos para procesar
+    const btn = document.getElementById("btnConfirmarPagoFinal");
+    if (pagosTemporales.length > 0) {
+        btn.disabled = false;
+        btn.style.background = "#27ae60";
+        btn.style.cursor = "pointer";
+    } else {
+        btn.disabled = true;
+        btn.style.background = "#ccc";
+        btn.style.cursor = "not-allowed";
+    }
+}
+
+async function procesarRegistroPagoMulti() {
+    const nombreClienteEnModal = document.getElementById("pagoClienteNombreTexto").innerText;
+    
+    if (!pedidoExistenteId) {
+        alert("Error: No se encontró el ID del pedido.");
+        return;
+    }
+
+    const nuevosPagos = pagosTemporales.map(p => ({
+        monto: p.monto,
+        metodo: p.metodo,
+        destinatario: p.destinatario,
+        fecha: new Date().toISOString()
+    }));
+
+    try {
+        // 1. Buscamos el pedido para obtener el array actual de la columna 'pagos'
+        let { data: pedidoData, error: errFetch } = await sb
+            .from("pedidos")
+            .select("pagos")
+            .eq("id", pedidoExistenteId)
+            .single();
+
+        if (errFetch) throw errFetch;
+
+        // 2. Fusionamos historial existente con los nuevos pagos
+        let historialActualizado = Array.isArray(pedidoData.pagos) ? pedidoData.pagos : [];
+        historialActualizado.push(...nuevosPagos);
+
+        // 3. ACTUALIZACIÓN FINAL: Solo en la tabla PEDIDOS
+        const { error: errUpdate } = await sb
+            .from("pedidos")
+            .update({ pagos: historialActualizado })
+            .eq("id", pedidoExistenteId);
+
+        if (errUpdate) throw errUpdate;
+
+        // 4. Éxito y cierre
+        descargarPDF(true); 
+        alert(`✅ Pagos registrados con éxito en el pedido de: ${nombreClienteEnModal}`);
+        
+        cerrarModalPago();
+        reiniciarPedido();
+
+    } catch (e) {
+        console.error("Error en el proceso de pago:", e);
+        alert("Hubo un error: " + e.message);
+    }
+}
+
+
+
 // Función para abrir el modal de checklist
 function abrirControlPedido() {
   document.getElementById("modalPDF").style.display = "none";
@@ -1064,18 +1414,20 @@ async function descargarPDFDesdeControl() {
 
 
   
-// ================== GENERAR PDF ==================
-async function descargarPDF() {
+function descargarPDF(esPago = false) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
-  const nombreCliente = (document.getElementById("clienteNombre").value || "").trim() || "Sin nombre";
-  const selectLocalidad = document.getElementById("clienteLocalidad");
-  const localidad = (selectLocalidad.options[selectLocalidad.selectedIndex]?.text || "Sin localidad").trim();
+  const nombreCliente = document.getElementById("clienteNombre").value || "Cliente";
+  const dni = document.getElementById("dni").value || "No informado";
+  const locSelect = document.getElementById("clienteLocalidad");
+  const localidad = locSelect.options[locSelect.selectedIndex]?.text || "No especificada";
   const fecha = new Date().toLocaleString("es-AR");
-  const dni = (document.getElementById("dni").value || "").trim() || "Sin DNI";
 
+  // Cálculos de productos y ahorros
+  const totalPedido = pedidoTemp.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
   let ahorroTotal = 0;
+  
   const productos = pedidoTemp.map(p => {
     const subtotal = p.precio * p.cantidad;
     if (p.precio_anterior && p.precio_anterior > p.precio) {
@@ -1090,42 +1442,82 @@ async function descargarPDF() {
     ];
   });
 
-  const logoURL = "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = logoURL;
+  // Logo de la distribuidora
+  const imgLogo = new Image();
+  imgLogo.src = "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
+  imgLogo.crossOrigin = "Anonymous";
 
-  img.onload = () => {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    doc.addImage(img, 'PNG', (pageWidth - 110) / 2, 10, 110, 35);
-    doc.setFontSize(16);
-    doc.text("Pedido Realizado", pageWidth / 2, 45, { align: "center" });
-    doc.setFontSize(12);
-    doc.text(`Cliente: ${nombreCliente}`, 10, 60);
-    doc.text(`DNI: ${dni}`, 10, 68);
-    doc.text(`Localidad: ${localidad}`, 10, 76);
-    doc.text(`Fecha: ${fecha}`, 10, 84);
+  imgLogo.onload = function () {
+    // Encabezado con Logo
+    doc.addImage(imgLogo, "PNG", 14, 10, 70, 25);
+    doc.setFontSize(18);
+    doc.setTextColor(41, 128, 185);
+    doc.text("REGISTRO DE PEDIDO", 120, 25);
+    
+     // Información del Cliente
+    doc.setDrawColor(200);
+    doc.line(14, 40, 196, 40);
+    doc.setFontSize(11);
+    doc.setTextColor(0);
+    doc.text(`Cliente: ${nombreCliente}`, 14, 48);
+    doc.text(`DNI: ${dni}`, 14, 54);
+    doc.text(`Localidad: ${localidad}`, 14, 60);
+    doc.text(`Fecha: ${fecha}`, 14, 66);
 
+    // Si es un flujo de pago, mostrar el resumen de entrega
+    let startYTable = 75;
+    if (esPago && typeof pagosTemporales !== 'undefined') {
+      const pagado = pagosTemporales.reduce((acc, p) => acc + p.monto, 0);
+      doc.setFontSize(12);
+      doc.setTextColor(39, 174, 96);
+      doc.text(`SE HA REGISTRADO UN PAGO DE: $${pagado.toFixed(2)}`, 14, 75);
+      doc.setTextColor(0);
+      startYTable = 82;
+    }
+
+    // Tabla de Contenido
     doc.autoTable({
-      startY: 92,
+      startY: startYTable,
       head: [["Producto", "Cant.", "P. Ant.", "P. Act.", "Subtotal"]],
       body: productos,
-      styles: { fontSize: 10 }
+      headStyles: { fillColor: [52, 152, 219] },
+      styles: { fontSize: 9 }
     });
 
     const finalY = doc.lastAutoTable.finalY || 100;
+    
+    // Cuadro de Totales
     doc.setFontSize(14);
-    doc.text(`Total: $${pedidoTemp.reduce((acc, p) => acc + p.precio * p.cantidad, 0).toFixed(2)}`, 150, finalY + 12);
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: $${totalPedido.toFixed(2)}`, 140, finalY + 15);
     
     if (ahorroTotal > 0) {
-      doc.setTextColor(0, 128, 0);
-      doc.text(`Ahorro total: $${ahorroTotal.toFixed(2)}`, 10, finalY + 30);
+      doc.setFontSize(11);
+      doc.setTextColor(39, 174, 96);
+      doc.text(`Ahorro total: $${ahorroTotal.toFixed(2)}`, 14, finalY + 15);
     }
 
-    doc.save(`pedido-${nombreCliente.replace(/\s+/g, '_')}.pdf`);
-    cerrarModalPDF();
+    doc.save(`Pedido_${nombreCliente.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  imgLogo.onerror = function() {
+    // Fallback si la imagen no carga
+    doc.setFontSize(18);
+    doc.text("DISTRIBUIDORA ALLANA", 14, 20);
+    doc.save(`Pedido_${nombreCliente.replace(/\s+/g, '_')}.pdf`);
   };
 }
+
+
+
+function cerrarModalPago() {
+    const modal = document.getElementById("modalPago");
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+
 
 // ================== INICIALIZACIÓN ==================
 window.addEventListener("DOMContentLoaded", async () => {
@@ -1150,6 +1542,9 @@ document.getElementById('modalImagen').addEventListener('click', function(e) {
     event.returnValue = ''; // Muestra el cuadro de diálogo estándar del navegador
   }
 });
+
+
+
 
   
 </script>
