@@ -517,7 +517,7 @@
       
       <div style="display: flex; justify-content: center; gap: 10px;">
         <button onclick="cerrarModalPDF()" style="background:#e74c3c; color:white;">Cerrar</button>
-        <button onclick="descargarPDF()" style="background:#27ae60; color:white;">Descargar PDF directo</button>
+        <button onclick="guardarYDescargarDirecto()" style="background:#27ae60; color:white;">Descargar PDF directo</button>
       </div>
     </div>
   </div>
@@ -1076,44 +1076,78 @@ async function consultarPedidosCliente() {
 
 // ================== CONFIRMAR PEDIDO ==================
 async function confirmarPedido() {
-  if (!document.getElementById("clienteNombre").value || !document.getElementById("clienteLocalidad").value) {
-    alert("Complete el nombre y la localidad");
+  const nombreCliente = document.getElementById("clienteNombre").value.trim();
+  const localidadId = document.getElementById("clienteLocalidad").value;
+  const dni = document.getElementById("dni").value.trim();
+
+  if (!nombreCliente || !localidadId || !dni) {
+    alert("⚠️ Por favor, complete nombre, DNI y localidad.");
     return;
   }
 
   if (pedidoTemp.length === 0) {
-    alert("No hay productos seleccionados");
+    alert("🛒 El carrito está vacío.");
     return;
   }
 
-  const nombreCliente = document.getElementById("clienteNombre").value.trim();
-  const localidadId = document.getElementById("clienteLocalidad").value;
   const totalCalculado = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
-  const dni = document.getElementById("dni").value.trim();
 
   try {
-    if (pedidoExistenteId) {
-      const { error } = await sb
-        .from("pedidos")
-        .update({ dni: dni, total: totalCalculado, productos: pedidoTemp })
-        .eq("id", pedidoExistenteId);
-      if (error) throw error;
-    } else {
-      const { data, error } = await sb
-        .from("pedidos")
-        .insert([{
-          cliente: nombreCliente,
-          dni: dni,
-          localidad_id: localidadId,
-          total: totalCalculado,
-          productos: pedidoTemp,
-          created_at: new Date().toISOString()
-        }])
-        .select();
-      if (error) throw error;
-      pedidoExistenteId = data[0].id;
+    // --- NUEVO: GESTIÓN DE CLIENTE ---
+    // Usamos upsert: si el DNI existe, lo ignora/actualiza; si no, lo crea.
+    const { data: clienteData, error: clienteError } = await sb
+      .from("clientes")
+      .upsert(
+        { 
+          nombre: nombreCliente, 
+          dni: dni, 
+          localidad_id: parseInt(localidadId),
+          ultima_compra: new Date().toISOString() 
+        }, 
+        { onConflict: 'dni' } // Evita duplicados basándose en el DNI
+      )
+      .select();
+
+    if (clienteError) {
+      console.warn("Error al gestionar cliente:", clienteError.message);
+      // Continuamos aunque falle el cliente para no bloquear la venta, 
+      // o puedes poner un throw si es obligatorio.
     }
 
+    // --- GUARDADO DEL PEDIDO ---
+    let resultado;
+    const datosPedido = {
+      cliente: nombreCliente,
+      dni: dni,
+      localidad_id: parseInt(localidadId),
+      total: totalCalculado,
+      productos: pedidoTemp,
+      archivado: false,
+      estado: "pendiente",
+      created_at: new Date().toISOString()
+    };
+
+    if (pedidoExistenteId) {
+      resultado = await sb
+        .from("pedidos")
+        .update(datosPedido)
+        .eq("id", pedidoExistenteId)
+        .select();
+    } else {
+      resultado = await sb
+        .from("pedidos")
+        .insert([datosPedido])
+        .select();
+    }
+
+    if (resultado.error) throw resultado.error;
+
+    if (resultado.data && resultado.data.length > 0) {
+      pedidoExistenteId = resultado.data[0].id;
+      console.log("Pedido guardado con ID:", pedidoExistenteId);
+    }
+
+    // --- DESCUENTO DE STOCK ---
     for (const prod of pedidoTemp) {
       await sb.rpc('descontar_stock', {
         producto_id: prod.id,
@@ -1124,25 +1158,63 @@ async function confirmarPedido() {
     document.getElementById("modalPDF").style.display = "flex";
 
   } catch (err) {
-    console.error(err);
-    alert("Error al procesar el pedido.");
+    console.error("Error crítico:", err);
+    alert("❌ Error: " + (err.message || "No se pudo procesar"));
   }
 }
 
+
+
+async function guardarYDescargarDirecto() {
+    try {
+        // 1. Ejecutamos la confirmación y ESPERAMOS a que termine (usando await)
+        // Esto asegura que pedidoExistenteId tenga valor antes de seguir
+        await confirmarPedido(); 
+
+        // 2. Descargamos el PDF
+        descargarPDF();
+
+        // 3. Cerramos el modal de opciones (modalPDF)
+        document.getElementById("modalPDF").style.display = "none";
+
+        // 4. Limpiamos todo para el siguiente cliente
+        reiniciarPedido();
+        
+        alert("✅ Pedido guardado y listo para uno nuevo.");
+    } catch (error) {
+        console.error("Error en el proceso:", error);
+        alert("Hubo un error al procesar el pedido.");
+    }
+}
+
+
 function reiniciarPedido() {
-localStorage.removeItem("pedido_respaldo");
-  pedidoTemp = [];
-  document.getElementById("clienteNombre").value = "";
-  document.getElementById("dni").value = "";
-  document.getElementById("clienteLocalidad").value = "";
-  document.getElementById("busquedaPromo").value = "";
-  document.getElementById("categoriaSelect").value = "";
-  document.getElementById("productosContainer").innerHTML = "";
-  document.getElementById("carritoTotal").textContent = "$0.00";
-  document.getElementById("carritoCount").textContent = "0";
-  window.scrollTo({ top: 0, behavior: "smooth" });
-  pedidoExistenteId = null;
-renderCarritoCliente();
+    // 1. Limpiar respaldo local
+    localStorage.removeItem("pedido_respaldo");
+
+    // 2. Resetear variables de lógica
+    pedidoTemp = [];
+    pedidoExistenteId = null; // <--- CRÍTICO: Esto evita que el nuevo pedido pise al anterior
+    pagosTemporales = [];
+    pagosPreviosBD = [];
+
+    // 3. Limpiar inputs visuales
+    document.getElementById("clienteNombre").value = "";
+    document.getElementById("dni").value = "";
+    document.getElementById("clienteLocalidad").value = "";
+    document.getElementById("busquedaPromo").value = "";
+    document.getElementById("categoriaSelect").value = "";
+    
+    // 4. Limpiar contenedores
+    document.getElementById("productosContainer").innerHTML = "";
+    document.getElementById("carritoTotal").textContent = "$0.00";
+    document.getElementById("carritoCount").textContent = "0";
+
+    // 5. Refrescar la vista del carrito
+    renderCarritoCliente();
+
+    // 6. Volver arriba
+    window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 
@@ -1405,13 +1477,20 @@ function cerrarControlPedido() {
   reiniciarPedido(); // Opcional: si quieres limpiar todo al cancelar
 }
 
-// Función especial para descargar y cerrar todo
 async function descargarPDFDesdeControl() {
-  await descargarPDF(); // Llama a tu función existente
-  document.getElementById("modalControlPedido").style.display = "none";
+    // 1. Asegurar guardado
+    await confirmarPedido(); 
+    
+    // 2. Descargar
+    descargarPDF(); 
+    
+    // 3. Cerrar este modal y el anterior
+    document.getElementById("modalControlPedido").style.display = "none";
+    document.getElementById("modalPDF").style.display = "none";
+    
+    // 4. Reset total
+    reiniciarPedido();
 }
-
-
 
   
 function descargarPDF(esPago = false) {
