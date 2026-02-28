@@ -458,7 +458,7 @@
 
 <body>
 <header>
-  <img src="https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png" alt="Logo Distribuidora">
+  <img src="https://rgbjinmllhhymczumwhs.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png" alt="Logo Distribuidora">
   🛍️ Tienda de Promociones de Distribuidora Allana
 </header>
 
@@ -603,8 +603,8 @@
 
 <script>
 // --- CONFIGURACIÓN DE SUPABASE ---
-const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
+const SUPABASE_URL = "https://rgbjinmllhhymczumwhs.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnYmppbm1sbGhoeW1jenVtd2hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNDA5MDcsImV4cCI6MjA3ODYxNjkwN30.y7uSk4gEVJNbPvuLDC0ZXOyA8OhogptbKAofodxgV1w";
 
 // Usamos 'sb' para evitar conflictos con la variable global 'supabase' que inyecta la CDN
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -903,7 +903,7 @@ function renderPromos(promos) {
 
     grupos[categoria].forEach(p => {
       const imgURL = p.imagen
-        ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
+        ? `https://rgbjinmllhhymczumwhs.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
         : "https://via.placeholder.com/200x140?text=Sin+Imagen";
 
       const nombreEscapado = p.nombre.replace(/'/g, "\\'");
@@ -1444,7 +1444,7 @@ function descargarPDF(esPago = false) {
 
   // Logo de la distribuidora
   const imgLogo = new Image();
-  imgLogo.src = "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
+  imgLogo.src = "https://rgbjinmllhhymczumwhs.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
   imgLogo.crossOrigin = "Anonymous";
 
   imgLogo.onload = function () {
