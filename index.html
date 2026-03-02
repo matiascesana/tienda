@@ -1033,12 +1033,18 @@ async function consultarPedidosCliente() {
     contenido.style = "background:white;padding:20px;border-radius:12px;max-width:400px;width:90%;text-align:left; max-height:80vh; overflow-y:auto;";
     contenido.innerHTML = `<h3>Pedidos encontrados:</h3>`;
 
-    pedidos.forEach(p => {
-      const fecha = new Date(p.created_at).toLocaleString("es-AR");
-      const estadoTexto = p.estado === 'archivado' ? '🔴 ARCHIVADO' : '🟢 ACTIVO';
-      const btn = document.createElement("button");
-      btn.style = `display:block;width:100%;margin:8px 0;padding:12px;border:1px solid #ccc;border-radius:8px;cursor:pointer;background-color:${p.estado === 'archivado' ? '#f7dbdb' : '#e0f7e9'}`;
-      btn.textContent = `[${estadoTexto}] - ${fecha} - $${p.total.toFixed(2)}`;
+   pedidos.forEach(p => {
+  const fecha = new Date(p.created_at).toLocaleString("es-AR");
+  const estadoTexto = p.estado === 'archivado' ? '🔴 ARCHIVADO' : '🟢 ACTIVO';
+  
+  // CORRECCIÓN: Forzamos que 'total' sea número y manejamos valores nulos
+  const totalNumerico = parseFloat(p.total) || 0; 
+
+  const btn = document.createElement("button");
+  btn.style = `display:block;width:100%;margin:8px 0;padding:12px;border:1px solid #ccc;border-radius:8px;cursor:pointer;background-color:${p.estado === 'archivado' ? '#f7dbdb' : '#e0f7e9'}`;
+  
+  // Usamos la variable totalNumerico que ya es segura
+  btn.textContent = `[${estadoTexto}] - ${fecha} - $${totalNumerico.toFixed(2)}`;
       
       btn.onclick = () => {
         pedidoTemp = [];
@@ -1099,7 +1105,7 @@ async function confirmarPedido() {
       .from("clientes")
       .upsert(
         { 
-          nombre: nombreCliente, 
+          nombre_completo: nombreCliente, 
           dni: dni, 
           localidad_id: parseInt(localidadId),
           ultima_compra: new Date().toISOString() 
@@ -1128,17 +1134,19 @@ async function confirmarPedido() {
     };
 
     if (pedidoExistenteId) {
-      resultado = await sb
-        .from("pedidos")
-        .update(datosPedido)
-        .eq("id", pedidoExistenteId)
-        .select();
-    } else {
-      resultado = await sb
-        .from("pedidos")
-        .insert([datosPedido])
-        .select();
-    }
+  // SI YA EXISTE, ACTUALIZAMOS EL REGISTRO ACTUAL
+  resultado = await sb
+    .from("pedidos")
+    .update(datosPedido)
+    .eq("id", pedidoExistenteId)
+    .select();
+} else {
+  // SI ES NUEVO, INSERTAMOS
+  resultado = await sb
+    .from("pedidos")
+    .insert([datosPedido])
+    .select();
+}
 
     if (resultado.error) throw resultado.error;
 
@@ -1147,13 +1155,17 @@ async function confirmarPedido() {
       console.log("Pedido guardado con ID:", pedidoExistenteId);
     }
 
-    // --- DESCUENTO DE STOCK ---
-    for (const prod of pedidoTemp) {
-      await sb.rpc('descontar_stock', {
-        producto_id: prod.id,
-        cantidad_a_descontar: prod.cantidad
-      });
-    }
+    if (!pedidoExistenteId) { 
+  // SOLO descuenta stock si NO es un pedido que ya existía en la base de datos
+  for (const prod of pedidoTemp) {
+    await sb.rpc('descontar_stock', {
+      producto_id: prod.id,
+      cantidad_a_descontar: prod.cantidad
+    });
+  }
+} else {
+  console.log("Edición de pedido: no se altera el stock automáticamente.");
+}
 
     document.getElementById("modalPDF").style.display = "flex";
 
@@ -1504,7 +1516,8 @@ function descargarPDF(esPago = false) {
   const fecha = new Date().toLocaleString("es-AR");
 
   // Cálculos de productos y ahorros
-  const totalPedido = pedidoTemp.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
+// En la función descargarPDF, busca donde calculas el totalPedido
+const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
   let ahorroTotal = 0;
   
   const productos = pedidoTemp.map(p => {
