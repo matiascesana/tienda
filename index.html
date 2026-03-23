@@ -1015,9 +1015,10 @@ async function consultarPedidosCliente() {
   if (!dni) { alert("Ingrese el DNI."); return; }
 
   try {
+    // 1. Traemos la columna 'archivado' que es la que define el estado real
     const { data: pedidos, error } = await sb
       .from("pedidos")
-      .select("id, created_at, total, productos, cliente, estado, pagos") 
+      .select("id, created_at, total, productos, cliente, archivado, pagos") 
       .ilike("dni", `%${dni}%`)
       .order("created_at", { ascending: false });
 
@@ -1029,47 +1030,72 @@ async function consultarPedidosCliente() {
 
     const modal = document.createElement("div");
     modal.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:2000;";
+    
     const contenido = document.createElement("div");
-    contenido.style = "background:white;padding:20px;border-radius:12px;max-width:400px;width:90%;text-align:left; max-height:80vh; overflow-y:auto;";
-    contenido.innerHTML = `<h3>Pedidos encontrados:</h3>`;
+    contenido.style = "background:white;padding:25px;border-radius:16px;max-width:450px;width:90%;text-align:left; max-height:85vh; overflow-y:auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);";
+    
+    contenido.innerHTML = `<h3 style="margin-top:0; color:#1e293b; font-family:sans-serif;">Historial de Pedidos:</h3>
+                           <p style="font-size:12px; color:#64748b; margin-bottom:15px;">Haga clic en un pedido ACTIVO para editarlo.</p>`;
 
-   pedidos.forEach(p => {
-  const fecha = new Date(p.created_at).toLocaleString("es-AR");
-  const estadoTexto = p.estado === 'archivado' ? '🔴 ARCHIVADO' : '🟢 ACTIVO';
-  
-  // CORRECCIÓN: Forzamos que 'total' sea número y manejamos valores nulos
-  const totalNumerico = parseFloat(p.total) || 0; 
+    pedidos.forEach(p => {
+      const fecha = new Date(p.created_at).toLocaleString("es-AR");
+      
+      // 2. Usamos la columna 'archivado' para la lógica visual
+      const esArchivado = p.archivado === true;
+      const estadoTexto = esArchivado ? '📦 ARCHIVADO' : '✅ ACTIVO';
+      const colorFondo = esArchivado ? '#f1f5f9' : '#e0f7e9';
+      const colorTexto = esArchivado ? '#64748b' : '#166534';
+      const totalNumerico = parseFloat(p.total) || 0; 
 
-  const btn = document.createElement("button");
-  btn.style = `display:block;width:100%;margin:8px 0;padding:12px;border:1px solid #ccc;border-radius:8px;cursor:pointer;background-color:${p.estado === 'archivado' ? '#f7dbdb' : '#e0f7e9'}`;
-  
-  // Usamos la variable totalNumerico que ya es segura
-  btn.textContent = `[${estadoTexto}] - ${fecha} - $${totalNumerico.toFixed(2)}`;
+      const btn = document.createElement("button");
+      btn.style = `display:block; width:100%; margin:10px 0; padding:15px; border:1px solid ${esArchivado ? '#e2e8f0' : '#bbf7d0'}; border-radius:12px; cursor:pointer; background-color:${colorFondo}; text-align:left; transition: transform 0.1s;`;
+      
+      // Aplicar un estilo visual de "deshabilitado" si está archivado
+      if (esArchivado) btn.style.opacity = "0.8";
+
+      btn.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:900; font-size:12px; color:${colorTexto};">${estadoTexto}</span>
+          <span style="font-size:11px; color:#94a3b8;">${fecha}</span>
+        </div>
+        <div style="margin-top:5px; font-size:16px; font-weight:900; color:#0f172a;">
+          $${totalNumerico.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+        </div>
+      `;
       
       btn.onclick = () => {
+        // 3. Si está archivado, podrías avisar que no es editable o simplemente dejarlo ver
+        if (esArchivado) {
+            alert("Este pedido ya está archivado y no puede modificarse. Se cargará solo para visualización.");
+        }
+
         pedidoTemp = [];
         pedidoExistenteId = p.id;
+        
         if (Array.isArray(p.productos)) {
           p.productos.forEach(prod => {
             pedidoTemp.push({
               id: prod.id,
               nombre: prod.nombre,
               precio: prod.precio,
-              precio_anterior: prod.precio_anterior,
+              precio_anterior: prod.precio_anterior || 0,
               cantidad: prod.cantidad
             });
           });
         }
+        
         renderCarritoCliente();
         document.body.removeChild(modal);
       };
+      
       contenido.appendChild(btn);
     });
 
     const cerrar = document.createElement("button");
-    cerrar.textContent = "Cerrar";
-    cerrar.style = "margin-top:20px;padding:12px;width:100%;background:#e74c3c;color:white;border:none;border-radius:8px;";
+    cerrar.textContent = "Cerrar Ventana";
+    cerrar.style = "margin-top:20px; padding:12px; width:100%; background:#1e293b; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;";
     cerrar.onclick = () => document.body.removeChild(modal);
+    
     contenido.appendChild(cerrar);
     modal.appendChild(contenido);
     document.body.appendChild(modal);
@@ -1079,6 +1105,8 @@ async function consultarPedidosCliente() {
     alert("Error al consultar pedidos.");
   }
 }
+
+
 
 // ================== CONFIRMAR PEDIDO ==================
 async function confirmarPedido() {
@@ -1097,31 +1125,18 @@ async function confirmarPedido() {
   }
 
   const totalCalculado = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
+  const fechaISO = new Date().toISOString(); // Evita el error de fecha null
 
   try {
-    // --- NUEVO: GESTIÓN DE CLIENTE ---
-    // Usamos upsert: si el DNI existe, lo ignora/actualiza; si no, lo crea.
-    const { data: clienteData, error: clienteError } = await sb
-      .from("clientes")
-      .upsert(
-        { 
+    // 1. GESTIÓN DE CLIENTE (Upsert para mantener base de datos actualizada)
+    await sb.from("clientes").upsert({ 
           nombre_completo: nombreCliente, 
           dni: dni, 
           localidad_id: parseInt(localidadId),
-          ultima_compra: new Date().toISOString() 
-        }, 
-        { onConflict: 'dni' } // Evita duplicados basándose en el DNI
-      )
-      .select();
+          ultima_compra: fechaISO 
+    }, { onConflict: 'dni' });
 
-    if (clienteError) {
-      console.warn("Error al gestionar cliente:", clienteError.message);
-      // Continuamos aunque falle el cliente para no bloquear la venta, 
-      // o puedes poner un throw si es obligatorio.
-    }
-
-    // --- GUARDADO DEL PEDIDO ---
-    let resultado;
+    // 2. PREPARAR DATOS DEL PEDIDO
     const datosPedido = {
       cliente: nombreCliente,
       dni: dni,
@@ -1130,50 +1145,51 @@ async function confirmarPedido() {
       productos: pedidoTemp,
       archivado: false,
       estado: "pendiente",
-      created_at: new Date().toISOString()
+      created_at: fechaISO
     };
 
+    let idParaStock;
+
     if (pedidoExistenteId) {
-  // SI YA EXISTE, ACTUALIZAMOS EL REGISTRO ACTUAL
-  resultado = await sb
-    .from("pedidos")
-    .update(datosPedido)
-    .eq("id", pedidoExistenteId)
-    .select();
-} else {
-  // SI ES NUEVO, INSERTAMOS
-  resultado = await sb
-    .from("pedidos")
-    .insert([datosPedido])
-    .select();
-}
+      // --- ESCENARIO: EDICIÓN ---
+      // Primero ajustamos stock (revertir anterior y descontar nuevo)
+      await sb.rpc('procesar_stock_pedido', {
+        p_pedido_id: pedidoExistenteId,
+        p_productos_nuevos: pedidoTemp,
+        p_es_edicion: true
+      });
 
-    if (resultado.error) throw resultado.error;
+      // Luego actualizamos el pedido
+      const { error } = await sb.from("pedidos").update(datosPedido).eq("id", pedidoExistenteId);
+      if (error) throw error;
+      idParaStock = pedidoExistenteId;
+      console.log("Pedido editado y stock sincronizado.");
+    } else {
+      // --- ESCENARIO: NUEVO ---
+      const { data, error } = await sb.from("pedidos").insert([datosPedido]).select();
+      if (error) throw error;
+      idParaStock = data[0].id;
+      pedidoExistenteId = idParaStock; // Actualizamos la referencia global
 
-    if (resultado.data && resultado.data.length > 0) {
-      pedidoExistenteId = resultado.data[0].id;
-      console.log("Pedido guardado con ID:", pedidoExistenteId);
+      // Descontamos stock inicial
+      await sb.rpc('procesar_stock_pedido', {
+        p_pedido_id: idParaStock,
+        p_productos_nuevos: pedidoTemp,
+        p_es_edicion: false
+      });
+      console.log("Nuevo pedido creado y stock descontado.");
     }
 
-    if (!pedidoExistenteId) { 
-  // SOLO descuenta stock si NO es un pedido que ya existía en la base de datos
-  for (const prod of pedidoTemp) {
-    await sb.rpc('descontar_stock', {
-      producto_id: prod.id,
-      cantidad_a_descontar: prod.cantidad
-    });
-  }
-} else {
-  console.log("Edición de pedido: no se altera el stock automáticamente.");
-}
-
+    // 3. FINALIZACIÓN
     document.getElementById("modalPDF").style.display = "flex";
 
   } catch (err) {
-    console.error("Error crítico:", err);
-    alert("❌ Error: " + (err.message || "No se pudo procesar"));
+    console.error("Error crítico en confirmarPedido:", err);
+    alert("❌ Error: " + (err.message || "No se pudo procesar el pedido"));
   }
 }
+
+
 
 
 
