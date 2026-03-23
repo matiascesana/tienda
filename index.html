@@ -1404,6 +1404,9 @@ async function procesarRegistroPagoMulti() {
         return;
     }
 
+    // Calculamos el total aquí para que esté disponible para el PDF y actualizaciones
+    const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
+
     const nuevosPagos = pagosTemporales.map(p => ({
         monto: p.monto,
         metodo: p.metodo,
@@ -1425,7 +1428,7 @@ async function procesarRegistroPagoMulti() {
         let historialActualizado = Array.isArray(pedidoData.pagos) ? pedidoData.pagos : [];
         historialActualizado.push(...nuevosPagos);
 
-        // 3. ACTUALIZACIÓN FINAL: Solo en la tabla PEDIDOS
+        // 3. ACTUALIZACIÓN FINAL
         const { error: errUpdate } = await sb
             .from("pedidos")
             .update({ pagos: historialActualizado })
@@ -1433,8 +1436,10 @@ async function procesarRegistroPagoMulti() {
 
         if (errUpdate) throw errUpdate;
 
-        // 4. Éxito y cierre
-        descargarPDF(true); 
+        // 4. Éxito y generación de PDF
+        // Usamos descargarPDF(true) que ya configuramos para leer pagosTemporales
+        descargarPDF(true, [...pagosTemporales]);
+        
         alert(`✅ Pagos registrados con éxito en el pedido de: ${nombreClienteEnModal}`);
         
         cerrarModalPago();
@@ -1445,7 +1450,6 @@ async function procesarRegistroPagoMulti() {
         alert("Hubo un error: " + e.message);
     }
 }
-
 
 
 // Función para abrir el modal de checklist
@@ -1521,7 +1525,7 @@ async function descargarPDFDesdeControl() {
 }
 
   
-function descargarPDF(esPago = false) {
+function descargarPDF(esPago = false, listaPagos = []) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
@@ -1531,9 +1535,8 @@ function descargarPDF(esPago = false) {
   const localidad = locSelect.options[locSelect.selectedIndex]?.text || "No especificada";
   const fecha = new Date().toLocaleString("es-AR");
 
-  // Cálculos de productos y ahorros
-// En la función descargarPDF, busca donde calculas el totalPedido
-const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
+  // Cálculos de productos
+  const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
   let ahorroTotal = 0;
   
   const productos = pedidoTemp.map(p => {
@@ -1550,19 +1553,17 @@ const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) ||
     ];
   });
 
-  // Logo de la distribuidora
   const imgLogo = new Image();
   imgLogo.src = "https://rgbjinmllhhymczumwhs.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
   imgLogo.crossOrigin = "Anonymous";
 
   imgLogo.onload = function () {
-    // Encabezado con Logo
+    // Encabezado
     doc.addImage(imgLogo, "PNG", 14, 10, 70, 25);
     doc.setFontSize(18);
     doc.setTextColor(41, 128, 185);
     doc.text("REGISTRO DE PEDIDO", 120, 25);
     
-     // Información del Cliente
     doc.setDrawColor(200);
     doc.line(14, 40, 196, 40);
     doc.setFontSize(11);
@@ -1572,16 +1573,27 @@ const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) ||
     doc.text(`Localidad: ${localidad}`, 14, 60);
     doc.text(`Fecha: ${fecha}`, 14, 66);
 
-    // Si es un flujo de pago, mostrar el resumen de entrega
+    // --- SECCIÓN DE PAGOS DETALLADOS ---
     let startYTable = 75;
-    if (esPago && typeof pagosTemporales !== 'undefined') {
-      const pagado = pagosTemporales.reduce((acc, p) => acc + p.monto, 0);
-      doc.setFontSize(12);
-      doc.setTextColor(39, 174, 96);
-      doc.text(`SE HA REGISTRADO UN PAGO DE: $${pagado.toFixed(2)}`, 14, 75);
-      doc.setTextColor(0);
-      startYTable = 82;
+    
+    // Usamos listaPagos (el parámetro) en lugar de la variable global directamente
+    if (esPago && listaPagos && listaPagos.length > 0) {
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(39, 174, 96); // Verde
+      
+      listaPagos.forEach((p, index) => {
+        const monto = parseFloat(p.monto).toFixed(2);
+        const metodo = (p.metodo || "EFECTIVO").toUpperCase();
+        const textoPago = `SE REGISTRÓ UN PAGO DE: $${monto} EN ${metodo}`;
+        doc.text(textoPago, 14, startYTable + (index * 6));
+      });
+
+      startYTable = startYTable + (listaPagos.length * 6) + 5;
     }
+
+    doc.setTextColor(0);
+    doc.setFont(undefined, 'normal');
 
     // Tabla de Contenido
     doc.autoTable({
@@ -1594,10 +1606,9 @@ const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) ||
 
     const finalY = doc.lastAutoTable.finalY || 100;
     
-    // Cuadro de Totales
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL: $${totalPedido.toFixed(2)}`, 140, finalY + 15);
+    doc.text(`TOTAL PEDIDO: $${totalPedido.toFixed(2)}`, 130, finalY + 15);
     
     if (ahorroTotal > 0) {
       doc.setFontSize(11);
@@ -1609,7 +1620,6 @@ const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) ||
   };
 
   imgLogo.onerror = function() {
-    // Fallback si la imagen no carga
     doc.setFontSize(18);
     doc.text("DISTRIBUIDORA ALLANA", 14, 20);
     doc.save(`Pedido_${nombreCliente.replace(/\s+/g, '_')}.pdf`);
