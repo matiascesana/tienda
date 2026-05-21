@@ -458,7 +458,7 @@
 
 <body>
 <header>
-  <img src="https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png" alt="Logo Distribuidora">
+  <img src="https://rgbjinmllhhymczumwhs.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png" alt="Logo Distribuidora">
   🛍️ Tienda de Promociones de Distribuidora Allana
 </header>
 
@@ -602,9 +602,18 @@
 
 
 <script>
+
+
+// Variable global para evitar recargas innecesarias desde Supabase
+let promosCache = []; 
+let isSaving = false; // Bloqueo para evitar envíos dobles
+let searchTimer; // Para el Debounce
+
+
+
 // --- CONFIGURACIÓN DE SUPABASE ---
-const SUPABASE_URL = "https://ejbqlejlgprvwzrptojo.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqYnFsZWpsZ3Bydnd6cnB0b2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwMjkwMjIsImV4cCI6MjA3MjYwNTAyMn0.9fVItJka0MN3nlfowVudIE0AuNmfTJGQcbbqpau2Th8";
+const SUPABASE_URL = "https://rgbjinmllhhymczumwhs.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnYmppbm1sbGhoeW1jenVtd2hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNDA5MDcsImV4cCI6MjA3ODYxNjkwN30.y7uSk4gEVJNbPvuLDC0ZXOyA8OhogptbKAofodxgV1w";
 
 // Usamos 'sb' para evitar conflictos con la variable global 'supabase' que inyecta la CDN
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -612,6 +621,9 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let todasLasPromos = [];
 let pedidoTemp = [];
 let pedidoExistenteId = null;
+
+
+
 
 
 // --- PERSISTENCIA DE DATOS ---
@@ -823,50 +835,67 @@ function cerrarModalImagen() {
   document.getElementById("modalImagen").style.display = "none";
 }
 
-// ================== CARGA PROMOS ==================
+
+
+
+// ================== CARGA PROMOS (Optimizado) ==================
 async function cargarPromosPorCategoria() {
   const catId = document.getElementById("categoriaSelect").value;
   const cont = document.getElementById("productosContainer");
-  cont.innerHTML = "";
-  if (!catId) return;
-
-  const { data: promos, error } = await sb
-    .from("promociones")
-    .select("*")
-    .eq("categoria_id", catId);
-
-  if (error) {
-    cont.innerHTML = "<p style='color:red;'>Error al cargar productos.</p>";
+  
+  if (!catId) {
+    cont.innerHTML = "";
     return;
   }
 
-  promos.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
-  todasLasPromos = promos;
-  renderPromos(promos);
+  // Si el caché está vacío, cargamos de Supabase UNA SOLA VEZ
+  if (promosCache.length === 0) {
+    const { data, error } = await sb
+      .from("promociones")
+      .select("id, nombre, precio, precio_anterior, stock, categoria_id, imagen");
+    
+    if (error) {
+      cont.innerHTML = "<p style='color:red;'>Error al cargar productos.</p>";
+      return;
+    }
+    promosCache = data || [];
+  }
+
+  // Filtramos localmente el array en memoria
+  const filtrados = promosCache.filter(p => p.categoria_id == catId);
+  filtrados.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  
+  renderPromos(filtrados);
 }
 
-// ================== FILTRADO BÚSQUEDA ==================
-let controlBusqueda = 0;
-document.getElementById("busquedaPromo").addEventListener("input", async (e) => {
+// ================== FILTRADO BÚSQUEDA (Optimizado con Debounce) ==================
+document.getElementById("busquedaPromo").addEventListener("input", (e) => {
   const texto = e.target.value.trim().toLowerCase();
   const catId = document.getElementById("categoriaSelect").value;
-  const cont = document.getElementById("productosContainer");
-  const idControlActual = ++controlBusqueda;
+  
+  // Debounce: espera 500ms antes de ejecutar la búsqueda
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    
+    // Si no hay nada en caché, cargamos primero (opcional)
+    if (promosCache.length === 0) {
+      cargarPromosPorCategoria(); // Esto cargará el caché
+      return;
+    }
 
-  if (texto.length === 0 && !catId) {
-    cont.innerHTML = "<p style='color:#888;'>Seleccione una categoría o busque una promoción.</p>";
-    return;
-  }
+    // Filtramos localmente sobre el caché usando categoría y texto
+    const filtrados = promosCache.filter(p => {
+      const matchCat = catId ? p.categoria_id == catId : true;
+      const matchTexto = p.nombre.toLowerCase().includes(texto);
+      return matchCat && matchTexto;
+    });
 
-  let query = sb.from("promociones").select("*");
-  if (catId) query = query.eq("categoria_id", catId);
-  if (texto.length > 0) query = query.ilike("nombre", `%${texto}%`);
-
-  const { data: promos, error } = await query;
-  if (idControlActual !== controlBusqueda) return;
-  if (error) { cont.innerHTML = "<p style='color:red;'>Error al buscar promociones.</p>"; return; }
-  renderPromos(promos);
+    renderPromos(filtrados);
+  }, 500); 
 });
+
+
+
 
 // ================== RENDERIZADO TARJETAS ==================
 function renderPromos(promos) {
@@ -903,7 +932,7 @@ function renderPromos(promos) {
 
     grupos[categoria].forEach(p => {
       const imgURL = p.imagen
-        ? `https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
+        ? `https://rgbjinmllhhymczumwhs.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
         : "https://via.placeholder.com/200x140?text=Sin+Imagen";
 
       const nombreEscapado = p.nombre.replace(/'/g, "\\'");
@@ -1108,8 +1137,13 @@ async function consultarPedidosCliente() {
 
 
 
-// ================== CONFIRMAR PEDIDO ==================
+// Variable global para bloquear múltiples clics
+let isProcessingOrder = false;
+
 async function confirmarPedido() {
+  // 1. Bloqueo de seguridad: evita múltiples envíos
+  if (isProcessingOrder) return;
+
   const nombreCliente = document.getElementById("clienteNombre").value.trim();
   const localidadId = document.getElementById("clienteLocalidad").value;
   const dni = document.getElementById("dni").value.trim();
@@ -1124,19 +1158,23 @@ async function confirmarPedido() {
     return;
   }
 
+  // Activamos el bloqueo
+  isProcessingOrder = true;
+  // Feedback visual opcional: cambia el texto del botón si tienes acceso a él
+  // document.getElementById("btnConfirmar").innerText = "Procesando...";
+
   const totalCalculado = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
-  const fechaISO = new Date().toISOString(); // Evita el error de fecha null
+  const fechaISO = new Date().toISOString();
 
   try {
-    // 1. GESTIÓN DE CLIENTE (Upsert para mantener base de datos actualizada)
+    // 2. GESTIÓN DE CLIENTE: Usamos upsert optimizado
     await sb.from("clientes").upsert({ 
-          nombre_completo: nombreCliente, 
-          dni: dni, 
-          localidad_id: parseInt(localidadId),
-          ultima_compra: fechaISO 
+        nombre_completo: nombreCliente, 
+        dni: dni, 
+        localidad_id: parseInt(localidadId),
+        ultima_compra: fechaISO 
     }, { onConflict: 'dni' });
 
-    // 2. PREPARAR DATOS DEL PEDIDO
     const datosPedido = {
       cliente: nombreCliente,
       dni: dni,
@@ -1148,32 +1186,28 @@ async function confirmarPedido() {
       created_at: fechaISO
     };
 
-    let idParaStock;
-
     if (pedidoExistenteId) {
       // --- ESCENARIO: EDICIÓN ---
-      // Primero ajustamos stock (revertir anterior y descontar nuevo)
+      // Revertir stock viejo y aplicar nuevo vía RPC
       await sb.rpc('procesar_stock_pedido', {
         p_pedido_id: pedidoExistenteId,
         p_productos_nuevos: pedidoTemp,
         p_es_edicion: true
       });
 
-      // Luego actualizamos el pedido
       const { error } = await sb.from("pedidos").update(datosPedido).eq("id", pedidoExistenteId);
       if (error) throw error;
-      idParaStock = pedidoExistenteId;
       console.log("Pedido editado y stock sincronizado.");
     } else {
       // --- ESCENARIO: NUEVO ---
-      const { data, error } = await sb.from("pedidos").insert([datosPedido]).select();
+      const { data, error } = await sb.from("pedidos").insert([datosPedido]).select('id');
       if (error) throw error;
-      idParaStock = data[0].id;
-      pedidoExistenteId = idParaStock; // Actualizamos la referencia global
+      
+      const nuevoId = data[0].id;
+      pedidoExistenteId = nuevoId; 
 
-      // Descontamos stock inicial
       await sb.rpc('procesar_stock_pedido', {
-        p_pedido_id: idParaStock,
+        p_pedido_id: nuevoId,
         p_productos_nuevos: pedidoTemp,
         p_es_edicion: false
       });
@@ -1186,9 +1220,12 @@ async function confirmarPedido() {
   } catch (err) {
     console.error("Error crítico en confirmarPedido:", err);
     alert("❌ Error: " + (err.message || "No se pudo procesar el pedido"));
+  } finally {
+    // 4. Liberamos el bloqueo siempre, incluso si hubo error
+    isProcessingOrder = false;
+    // document.getElementById("btnConfirmar").innerText = "Confirmar Pedido";
   }
 }
-
 
 
 
@@ -1554,7 +1591,7 @@ function descargarPDF(esPago = false, listaPagos = []) {
   });
 
   const imgLogo = new Image();
-  imgLogo.src = "https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
+  imgLogo.src = "https://rgbjinmllhhymczumwhs.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png";
   imgLogo.crossOrigin = "Anonymous";
 
   imgLogo.onload = function () {
