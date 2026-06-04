@@ -840,61 +840,54 @@ function cerrarModalImagen() {
 
 // ================== CARGA PROMOS (Optimizado) ==================
 async function cargarPromosPorCategoria() {
-  const catId = document.getElementById("categoriaSelect").value;
-  const cont = document.getElementById("productosContainer");
-  
-  if (!catId) {
-    cont.innerHTML = "";
-    return;
-  }
-
-  // Si el caché está vacío, cargamos de Supabase UNA SOLA VEZ
-  if (promosCache.length === 0) {
-    const { data, error } = await sb
-      .from("promociones")
-      .select("id, nombre, precio, precio_anterior, stock, categoria_id, imagen");
-    
-    if (error) {
-      cont.innerHTML = "<p style='color:red;'>Error al cargar productos.</p>";
-      return;
-    }
-    promosCache = data || [];
-  }
-
-  // Filtramos localmente el array en memoria
-  const filtrados = promosCache.filter(p => p.categoria_id == catId);
-  filtrados.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
-  
-  renderPromos(filtrados);
+  await filtrarProductos();
 }
 
 // ================== FILTRADO BÚSQUEDA (Optimizado con Debounce) ==================
-document.getElementById("busquedaPromo").addEventListener("input", (e) => {
-  const texto = e.target.value.trim().toLowerCase();
-  const catId = document.getElementById("categoriaSelect").value;
-  
-  // Debounce: espera 500ms antes de ejecutar la búsqueda
+document.getElementById("busquedaPromo").addEventListener("input", () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    
-    // Si no hay nada en caché, cargamos primero (opcional)
-    if (promosCache.length === 0) {
-      cargarPromosPorCategoria(); // Esto cargará el caché
-      return;
-    }
-
-    // Filtramos localmente sobre el caché usando categoría y texto
-    const filtrados = promosCache.filter(p => {
-      const matchCat = catId ? p.categoria_id == catId : true;
-      const matchTexto = p.nombre.toLowerCase().includes(texto);
-      return matchCat && matchTexto;
-    });
-
-    renderPromos(filtrados);
-  }, 500); 
+  searchTimer = setTimeout(async () => {
+    await filtrarProductos();
+  }, 400); 
 });
 
 
+
+async function filtrarProductos() {
+  const catId = document.getElementById("categoriaSelect").value;
+  const texto = document.getElementById("busquedaPromo").value.trim();
+  const cont = document.getElementById("productosContainer");
+
+  // Limpieza: si no hay filtros, no traemos nada
+  if (!catId && !texto) {
+    cont.innerHTML = "";
+    promosCache = [];
+    return;
+  }
+
+  // Consulta dinámica a Supabase
+  let query = sb.from("promociones").select("id, nombre, precio, precio_anterior, stock, categoria_id, imagen");
+
+  if (catId) {
+    query = query.eq("categoria_id", catId);
+  }
+  
+  if (texto) {
+    query = query.ilike("nombre", `%${texto}%`);
+  }
+
+  const { data, error } = await query.order("nombre", { ascending: true });
+
+  if (error) {
+    console.error("Error al filtrar:", error);
+    cont.innerHTML = "<p style='color:red;'>Error al buscar productos.</p>";
+    return;
+  }
+
+  // Renderizado
+  promosCache = data || [];
+  renderPromos(promosCache);
+}
 
 
 // ================== RENDERIZADO TARJETAS ==================
@@ -1678,26 +1671,13 @@ function cerrarModalPago() {
 window.addEventListener("DOMContentLoaded", async () => {
   await cargarCategorias();
   await cargarLocalidades();
-  cargarEstadoLocal(); // <--- Llamar a la recuperación de datos aquí
+  // Se eliminó cualquier llamada a cargar productos aquí
+  cargarEstadoLocal(); 
 
-  // Escuchar cambios en los inputs para guardar automáticamente
   ["clienteNombre", "dni", "clienteLocalidad"].forEach(id => {
     document.getElementById(id).addEventListener("input", guardarEstadoLocal);
   });
 });
-
-// Listener para cerrar modal imagen al click fuera
-document.getElementById('modalImagen').addEventListener('click', function(e) {
-  if (e.target === this) cerrarModalImagen();
-});
-
-  window.addEventListener('beforeunload', (event) => {
-  if (pedidoTemp.length > 0) {
-    event.preventDefault();
-    event.returnValue = ''; // Muestra el cuadro de diálogo estándar del navegador
-  }
-});
-
 
 
 
