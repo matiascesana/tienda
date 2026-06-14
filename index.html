@@ -1006,19 +1006,25 @@ function renderCarritoCliente() {
   if (pedidoTemp.length === 0) {
     contenedor.innerHTML = "<span style='color:#888;'>🛒 No hay productos seleccionados</span>";
     document.getElementById("carritoTotal").textContent = "$0.00";
-    document.getElementById("carritoCount").textContent = "0";
-    guardarEstadoLocal();
     return;
   }
 
-  contenedor.innerHTML = pedidoTemp.map(p => `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;padding:10px;border:1px solid #ccc;border-radius:10px; background:#fff;">
-      <div style="flex:1; font-weight:bold; color:#333;">${p.nombre}</div>
-      <div style="display:flex; align-items:center; gap:6px; border:1px solid #ddd; border-radius:6px; padding:2px 4px;">
+  contenedor.innerHTML = pedidoTemp.map((p, index) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;padding:10px;border:1px solid #ccc;border-radius:10px; background:#fff; flex-wrap:wrap;">
+      <div style="flex:2; font-weight:bold; color:#333;">${p.nombre}</div>
+      
+      <div style="display:flex; align-items:center; gap:6px;">
+        <input type="number" value="${p.precio.toFixed(2)}" 
+          style="width:70px; padding:5px; border:1px solid #ddd; border-radius:4px;"
+          onchange="actualizarPrecioEnCarrito(${index}, this.value)">
+      </div>
+
+      <div style="display:flex; align-items:center; gap:6px;">
         <button onclick="modificarCantidad(${p.id}, -1)" style="background:#e74c3c;color:white;border:none;border-radius:4px;padding:4px 8px; cursor:pointer;">−</button>
-        <span style="min-width:24px; text-align:center;">${p.cantidad}</span>
+        <span>${p.cantidad}</span>
         <button onclick="modificarCantidad(${p.id}, 1)" style="background:#27ae60;color:white;border:none;border-radius:4px;padding:4px 8px; cursor:pointer;">+</button>
       </div>
+
       <div style="width:70px; text-align:right; font-weight:bold; color:#e74c3c;">
         $${(p.precio * p.cantidad).toFixed(2)}
       </div>
@@ -1027,9 +1033,21 @@ function renderCarritoCliente() {
 
   const total = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
   document.getElementById("carritoTotal").textContent = `$${total.toFixed(2)}`;
-  document.getElementById("carritoCount").textContent = pedidoTemp.reduce((sum, p) => sum + p.cantidad, 0);
   guardarEstadoLocal();
 }
+
+
+function actualizarPrecioEnCarrito(index, nuevoPrecio) {
+  const precio = parseFloat(nuevoPrecio);
+  if (!isNaN(precio) && precio >= 0) {
+    pedidoTemp[index].precio = precio;
+    renderCarritoCliente(); // Refresca los totales al cambiar el precio
+  } else {
+    alert("Por favor, ingrese un precio válido.");
+    renderCarritoCliente(); // Resetea si el valor es inválido
+  }
+}
+
 
 // ================== CONSULTA PEDIDOS DNI ==================
 async function consultarPedidosCliente() {
