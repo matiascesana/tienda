@@ -759,17 +759,21 @@
     <hr>
     <div id="historialPagosPrevios"></div>
     <div style="background:#f8f9fa;padding:14px;border-radius:8px;margin-bottom:14px;">
-      <div style="display:flex;gap:10px;margin-bottom:10px;">
-        <div style="flex:1;">
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:110px;">
           <label style="font-size:12px;color:#666;">Monto:</label>
           <input type="number" id="inputMontoIndividual" placeholder="0.00">
         </div>
-        <div style="flex:1;">
+        <div style="flex:1;min-width:110px;">
           <label style="font-size:12px;color:#666;">Método:</label>
           <select id="inputMetodoIndividual" onchange="toggleDestinatarioMulti()">
             <option value="Efectivo">Efectivo</option>
             <option value="Transferencia">Transferencia</option>
           </select>
+        </div>
+        <div style="flex:1;min-width:130px;">
+          <label style="font-size:12px;color:#666;">Fecha del pago:</label>
+          <input type="date" id="inputFechaIndividual">
         </div>
       </div>
       <div id="campoDestinatarioMulti" style="display:none;margin-bottom:10px;">
@@ -1749,6 +1753,11 @@ async function mostrarFormularioPago() {
     actualizarVistaPagos();
     document.getElementById("modalPDF").style.display = "none";
     document.getElementById("modalPago").style.display = "flex";
+
+    // La fecha del pago se autocompleta con hoy, pero queda editable
+    // por si el usuario está cargando un pago de un día anterior.
+    const inputFecha = document.getElementById("inputFechaIndividual");
+    if (inputFecha) inputFecha.value = new Date().toISOString().slice(0, 10);
 }
 
 function toggleDestinatarioMulti() {
@@ -1760,18 +1769,20 @@ function agregarPagoALista() {
     const monto = parseFloat(document.getElementById("inputMontoIndividual").value);
     const metodo = document.getElementById("inputMetodoIndividual").value;
     const destinatario = (metodo === "Transferencia") ? document.getElementById("inputDestinatarioIndividual").value : "-";
+    const fechaInput = document.getElementById("inputFechaIndividual").value; // formato YYYY-MM-DD
 
     if (isNaN(monto) || monto <= 0) return alert("Ingrese un monto válido.");
+    if (!fechaInput) return alert("Ingrese la fecha del pago.");
 
     pagosTemporales.push({
-        fecha: new Date().toISOString(),
+        fecha: fechaInput, // formato YYYY-MM-DD, compatible con los filtros e inputs de fecha del panel
         monto: monto,
         metodo: metodo,
         destinatario: destinatario,
         pedido_id: pedidoExistenteId
     });
 
-    // Limpiar inputs
+    // Limpiar inputs (mantenemos la fecha elegida para el próximo pago)
     document.getElementById("inputMontoIndividual").value = "";
     document.getElementById("inputDestinatarioIndividual").value = "";
     actualizarVistaPagos();
@@ -1844,7 +1855,7 @@ async function procesarRegistroPagoMulti() {
         monto: p.monto,
         metodo: p.metodo,
         destinatario: p.destinatario,
-        fecha: new Date().toISOString()
+        fecha: p.fecha // se respeta la fecha real del pago, elegida por el usuario
     }));
 
     try {
