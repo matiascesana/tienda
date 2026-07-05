@@ -4,223 +4,464 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Tienda de Pedidos - Distribuidora</title>
-  <link rel="manifest" href="manifest.json">
 
 <style>
+  /* ── Variables de color (cambiar aquí afecta toda la página) ── */
+  :root {
+    --c-primary:   #2980b9;
+    --c-primary-d: #1a6089;
+    --c-success:   #27ae60;
+    --c-success-d: #1e8449;
+    --c-danger:    #e74c3c;
+    --c-warning:   #f39c12;
+    --c-warning-d: #e67e22;
+    --c-text:      #2c3e50;
+    --c-muted:     #64748b;
+    --c-bg:        #f0f2f5;
+    --c-surface:   #ffffff;
+    --c-border:    #e2e8f0;
+  }
+
+  * { box-sizing: border-box; }
+
   body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f0f2f5;
+    background: var(--c-bg);
     margin: 0;
     padding: 0;
     overflow-x: hidden;
   }
 
+  /* ── Header compacto ── */
   header {
-    background: linear-gradient(90deg, #3498db, #2980b9);
+    background: var(--c-primary);
     color: white;
-    padding: 20px;
-    text-align: center;
-    font-size: 22px;
-    font-weight: bold;
+    padding: 12px 20px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 15px;
+    justify-content: space-between;
+    gap: 12px;
     flex-wrap: wrap;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
 
+  .header-left { display: flex; align-items: center; gap: 12px; }
+
   header img {
-    height: 80px;
-    max-width: 40%;
+    height: 48px;
     object-fit: contain;
-    border-radius: 10px;
-    border: 2px solid white;
+    border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.4);
   }
+
+  .header-title {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .header-title small {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.8;
+  }
+
+  /* Badge en header que muestra ítems del carrito */
+  #headerCarritoBadge {
+    background: var(--c-warning);
+    color: white;
+    border-radius: 99px;
+    padding: 6px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    display: none;
+    cursor: pointer;
+    white-space: nowrap;
+    border: none;
+  }
+
+  #headerCarritoBadge:hover { background: var(--c-warning-d); }
 
   main {
     max-width: 1000px;
-    margin: 25px auto;
-    background: white;
+    margin: 20px auto;
+    background: var(--c-surface);
     border-radius: 12px;
-    padding: 25px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    padding: 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
   }
 
-  select, input[type="text"] {
+  select, input[type="text"], input[type="number"] {
     width: 100%;
-    padding: 14px;
-    margin-top: 12px;
-    border: 1px solid #ccc;
+    padding: 12px 14px;
+    margin-top: 10px;
+    border: 1.5px solid var(--c-border);
     border-radius: 8px;
-    font-size: 16px;
-    transition: 0.2s;
+    font-size: 15px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: #fff;
+    color: var(--c-text);
   }
 
-  select:focus, input[type="text"]:focus {
-    border-color: #3498db;
+  select:focus, input[type="text"]:focus, input[type="number"]:focus {
+    border-color: var(--c-primary);
     outline: none;
-    box-shadow: 0 0 5px rgba(52,152,219,0.5);
+    box-shadow: 0 0 0 3px rgba(41,128,185,0.15);
   }
 
+  /* ── Sección catálogo ── */
+  .seccion-catalogo {
+    background: #f8fafc;
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+
+  .seccion-catalogo h2 {
+    font-size: 16px;
+    color: var(--c-text);
+    margin: 0 0 12px;
+  }
+
+  /* ── Sección datos cliente ── */
+  .seccion-cliente {
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+
+  .seccion-cliente h3 {
+    font-size: 16px;
+    color: var(--c-text);
+    margin: 0 0 12px;
+  }
+
+  /* ── Cards de producto ── */
   .productos-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 18px;
-    margin-top: 20px;
+    gap: 14px;
+    margin-top: 16px;
     justify-content: flex-start;
   }
 
   .promo-card {
-    width: 48%;
-    max-width: 220px;
-    border: 1px solid #ddd;
+    width: calc(50% - 8px);
+    max-width: 210px;
+    border: 1px solid var(--c-border);
     border-radius: 12px;
-    padding: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    background: #fff;
+    padding: 10px;
+    background: var(--c-surface);
     display: flex;
     flex-direction: column;
     align-items: center;
-    transition: 0.3s;
+    transition: box-shadow 0.2s, transform 0.2s;
   }
 
   .promo-card:hover {
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    transform: translateY(-3px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
   }
 
   .promo-card img {
     width: 100%;
-    height: 150px;
+    height: 160px;
     object-fit: cover;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: zoom-in;
+    background: #f1f5f9;
   }
 
   .promo-card h3 {
-    font-size: 15px;
-    margin: 0 0 8px 0;
+    font-size: 13px;
+    margin: 0 0 6px;
     text-align: center;
+    color: var(--c-text);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 34px;
   }
 
-  .promo-card p {
-    margin: 5px 0;
-    font-weight: bold;
+  .stock-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+    margin-bottom: 4px;
   }
 
-  .promo-card button {
-    background: #27ae60;
-    color: #fff;
+  .stock-ok     { background: #dcfce7; color: #166534; }
+  .stock-low    { background: #fef9c3; color: #92400e; }
+  .stock-out    { background: #fee2e2; color: #991b1b; }
+
+  .precio-actual {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--c-danger);
+    margin: 2px 0;
+  }
+
+  .precio-anterior {
+    font-size: 11px;
+    text-decoration: line-through;
+    color: var(--c-muted);
+    margin-bottom: 2px;
+  }
+
+  .add-to-cart-btn {
+    background: var(--c-success);
+    color: white;
     border: none;
-    padding: 12px;
-    border-radius: 10px;
+    padding: 9px;
+    border-radius: 8px;
     cursor: pointer;
-    margin-top: auto;
-    font-size: 15px;
+    font-size: 14px;
+    font-weight: 600;
     width: 100%;
-    transition: 0.2s;
+    margin-top: 8px;
+    transition: background 0.2s;
   }
 
-  .promo-card button:hover {
-    background: #1e8449;
+  .add-to-cart-btn:hover { background: var(--c-success-d); }
+
+  /* ── Controles cantidad en card ── */
+  .quantity-controls-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1.5px solid var(--c-border);
+    border-radius: 8px;
+    overflow: hidden;
+    height: 34px;
+    width: 110px;
+    margin: 6px auto 0;
   }
 
-  #consultarPedidosCliente {
-    background-color: #f39c12 !important;
-    color: white !important;
-    border: none !important;
-    transition: background-color 0.2s;
+  .btn-cantidad-menos, .btn-cantidad-mas {
+    background: var(--c-primary);
+    color: white;
+    border: none;
+    width: 34px;
+    height: 100%;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: bold;
+    transition: background 0.15s;
+    line-height: 1;
   }
 
-  #consultarPedidosCliente:hover {
-    background-color: #e67e22 !important;
+  .btn-cantidad-menos:hover, .btn-cantidad-mas:hover { background: var(--c-primary-d); }
+
+  .cantidad-display-card {
+    flex-grow: 1;
+    text-align: center;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--c-text);
   }
 
-  #carritoResumen {
-    margin-top: 20px;
-    background: #f9f9f9;
-    border: 1px solid #ddd;
+  /* ── Carrito ── */
+  #seccionCarrito {
+    border: 1.5px solid #bbf7d0;
     border-radius: 10px;
-    padding: 15px;
-    max-height: 320px;
+    padding: 16px;
+    margin-bottom: 20px;
+    background: #f0fdf4;
+  }
+  #tablaPresupuesto { table-layout: fixed; }
+  #tablaPresupuesto thead tr,
+  #tablaPresupuesto tbody tr,
+  #tablaPresupuesto tfoot tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+  #tablaPresupuesto tbody#carritoLista {
+    display: block;
+    max-height: 46vh;
+    min-height: 90px;
     overflow-y: auto;
   }
+  @media (min-width: 900px) {
+    #tablaPresupuesto tbody#carritoLista { max-height: 480px; }
+  }
 
-  #carritoLista div {
+  #seccionCarrito h3 { margin: 0 0 12px; color: var(--c-text); font-size: 16px; }
+
+  #carritoLista > div {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin: 8px 0;
-    flex-wrap: wrap;
-    padding: 8px;
+    padding: 10px;
+    border: 1px solid var(--c-border);
     border-radius: 8px;
-    border: 1px solid #eee;
-    background: #fff;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    background: white;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
-  #carritoLista span {
-    font-weight: bold;
-    color: #333;
+  .carrito-nombre { flex: 2; font-weight: 600; color: var(--c-text); font-size: 14px; }
+  .carrito-precio-input { width: 70px; padding: 5px; border: 1px solid var(--c-border); border-radius: 4px; font-size: 13px; text-align: center; }
+  .carrito-cant-ctrl { display: flex; align-items: center; gap: 5px; }
+  .btn-cant { padding: 4px 9px; border: none; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; color: white; }
+  .btn-cant-menos { background: var(--c-danger); }
+  .btn-cant-mas   { background: var(--c-success); }
+  .carrito-subtotal { width: 70px; text-align: right; font-weight: 700; color: var(--c-danger); font-size: 14px; }
+
+  .carrito-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 4px 0;
+    border-top: 1px solid #bbf7d0;
+    margin-top: 8px;
   }
 
-  .carrito-btns button {
-    margin: 3px 2px;
-    background: #3498db;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    padding: 6px 10px;
-    font-size: 14px;
-    transition: 0.2s;
-  }
+  .carrito-total-label { font-size: 15px; color: var(--c-muted); }
+  .carrito-total-valor { font-size: 22px; font-weight: 800; color: var(--c-success); }
 
-  .carrito-btns button:hover {
-    background: #2c80ba;
-  }
-
-  .btn-eliminar {
-    background: #e74c3c !important;
-  }
-
+  /* ── Botones principales ── */
   .btn-confirmar {
     width: 100%;
-    padding: 16px;
-    margin-top: 15px;
-    background: #27ae60;
+    padding: 15px;
+    margin-top: 14px;
+    background: var(--c-success);
     color: white;
     border: none;
     border-radius: 10px;
     cursor: pointer;
     font-size: 16px;
-    font-weight: bold;
-    transition: 0.2s;
+    font-weight: 700;
+    transition: background 0.2s;
+    letter-spacing: 0.02em;
   }
 
-  .btn-confirmar:hover {
-    background: #0056b3;
-  }
+  .btn-confirmar:hover { background: var(--c-success-d); }
 
-  footer {
-    text-align: center;
-    padding: 20px;
+  .btn-visita {
+    background: var(--c-warning-d);
+    color: white;
+    padding: 11px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    width: 100%;
+    margin-top: 10px;
     font-size: 14px;
-    color: #777;
+    transition: background 0.2s;
   }
 
-  /* Modal PDF */
+  .btn-visita:hover { background: #cc6a10; }
+
+  .btn-buscar-cliente {
+    background: var(--c-warning);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.2s;
+  }
+
+  .btn-buscar-cliente:hover { background: var(--c-warning-d); }
+
+  #consultarPedidosCliente {
+    background: var(--c-warning) !important;
+    color: white !important;
+    border: none !important;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+
+  #consultarPedidosCliente:hover { background: var(--c-warning-d) !important; }
+
+  /* ── Carrito sticky bottom (mobile) ── */
+  #carritoSticky {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--c-success);
+    color: white;
+    padding: 14px 20px;
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 500;
+    box-shadow: 0 -3px 12px rgba(0,0,0,0.2);
+    cursor: pointer;
+  }
+
+  #carritoSticky .sticky-info { font-size: 14px; }
+  #carritoSticky .sticky-total { font-size: 18px; font-weight: 800; }
+  #carritoSticky .sticky-btn { background: white; color: var(--c-success); border: none; border-radius: 8px; padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 14px; }
+
+  /* ── Carrusel ── */
+  .categoria-seccion { margin-bottom: 28px; width: 100%; }
+
+  .categoria-titulo {
+    font-size: 15px;
+    color: var(--c-primary);
+    border-left: 4px solid var(--c-primary);
+    padding: 4px 0 4px 10px;
+    margin-bottom: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .carousel-wrapper {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding: 6px 4px 10px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .carousel-wrapper::-webkit-scrollbar { height: 4px; }
+  .carousel-wrapper::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+  .promo-card { flex: 0 0 auto; width: 190px; }
+
+  /* ── Checklist preparación ── */
+  .item-control {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    gap: 14px;
+  }
+
+  .item-control input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; }
+  .item-control label { flex: 1; font-size: 15px; cursor: pointer; }
+  .item-control.checked { background: #f0fdf4; color: #888; text-decoration: line-through; }
+
+  /* ── Modales ── */
   #modalPDF {
     display: none;
     position: fixed;
     top:0; left:0;
     width:100%; height:100%;
     background: rgba(0,0,0,0.65);
-    justify-content:center;
-    align-items:center;
-    z-index:2000;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
     padding: 15px;
     box-sizing: border-box;
   }
@@ -236,36 +477,26 @@
   }
 
   #modalPDF .modal-content button {
-    padding: 14px 22px;
-    margin: 12px;
-    font-size:16px;
+    padding: 13px 20px;
+    margin: 8px;
+    font-size: 15px;
     border-radius: 10px;
     cursor: pointer;
-    border:none;
-    transition: 0.2s;
+    border: none;
+    transition: opacity 0.2s;
+    font-weight: 600;
   }
 
-  #modalPDF .modal-content button:nth-child(2) {
-    background:#e74c3c;
-    color:white;
-  }
+  #modalPDF .modal-content button:hover { opacity: 0.88; }
 
-  #modalPDF .modal-content button:nth-child(3) {
-    background:#27ae60;
-    color:white;
-  }
-
-  /* Modal para la imagen ampliada */
   #modalImagen {
     display: none;
     position: fixed !important;
     z-index: 99999 !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100%;
-    height: 100%;
-    overflow: auto; 
-    background-color: rgba(0,0,0,0.9);
+    left: 0 !important; top: 0 !important;
+    width: 100%; height: 100%;
+    overflow: auto;
+    background: rgba(0,0,0,0.9);
     align-items: center;
     justify-content: center;
   }
@@ -274,9 +505,8 @@
     position: relative;
     margin: auto;
     padding: 20px;
-    background-color: #fefefe;
+    background: #fff;
     border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     text-align: center;
     max-width: 90%;
     max-height: 90%;
@@ -285,171 +515,44 @@
     align-items: center;
   }
 
-  #modalImagen img {
-    max-width: 100%;
-    max-height: 75vh;
-    display: block;
-    margin: 0 auto 15px auto;
-    border-radius: 8px;
-  }
+  #modalImagen img { max-width: 100%; max-height: 75vh; display: block; margin: 0 auto 15px; border-radius: 8px; }
 
   #modalImagen .close-button {
-    background-color: #e74c3c;
+    background: var(--c-danger);
     color: white;
     border: none;
     padding: 10px 20px;
     border-radius: 5px;
     cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.2s;
-  }
-
-  #modalImagen .close-button:hover {
-    background-color: #c0392b;
-  }
-
-  @media (max-width: 800px) {
-    #consultarPedidosCliente {
-      font-size: 18px;
-      padding: 12px 16px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .promo-card {
-      width: 100%;
-    }
-    header img {
-      max-width: 60%;
-      height: auto;
-    }
-    header {
-      font-size: 18px;
-    }
-  }
-
-  .quantity-controls-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    overflow: hidden;
-    height: 35px;
-    max-width: 120px;
-    margin: 0 auto;
-  }
-
-  .btn-cantidad-menos, .btn-cantidad-mas {
-    background: #3498db;
-    color: white;
-    border: none;
-    padding: 0;
-    width: 35px;
-    height: 100%;
-    cursor: pointer;
-    font-size: 18px;
-    font-weight: bold;
-    transition: background-color 0.2s;
-    line-height: 1;
-  }
-
-  .btn-cantidad-menos:hover, .btn-cantidad-mas:hover {
-    background-color: #2980b9;
-  }
-
-  .cantidad-display-card {
-    flex-grow: 1;
-    text-align: center;
-    font-weight: bold;
-    font-size: 16px;
-    color: #333;
-    padding: 0 5px;
-  }
-
-  .add-to-cart-btn {
-    background: #27ae60;
-    color: #fff;
-    border: none;
-    padding: 10px;
-    border-radius: 8px;
-    cursor: pointer;
     font-size: 15px;
-    width: 100%;
-    transition: 0.2s;
+    transition: background 0.2s;
   }
 
-  .add-to-cart-btn:hover {
-    background: #1e8449;
+  #modalImagen .close-button:hover { background: #c0392b; }
+
+  /* ── Separador de secciones ── */
+  .section-divider {
+    border: none;
+    border-top: 1px solid var(--c-border);
+    margin: 20px 0;
   }
 
-.item-control {
-  display: flex;
-  align-items: center;
-  padding: 12px;
-  border-bottom: 1px solid #eee;
-  gap: 15px;
-}
+  /* ── Footer ── */
+  footer { text-align: center; padding: 20px; font-size: 13px; color: var(--c-muted); padding-bottom: 80px; }
 
-.item-control input[type="checkbox"] {
-  width: 22px;
-  height: 22px;
-  cursor: pointer;
-}
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .promo-card { width: calc(50% - 6px); max-width: none; }
+    main { margin: 10px; padding: 14px; border-radius: 8px; }
+    header { padding: 10px 14px; }
+    .header-title { font-size: 15px; }
+  }
 
-.item-control label {
-  flex: 1;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.item-control.checked {
-  background-color: #f0fdf4;
-  color: #888;
-  text-decoration: line-through;
-}  
-
-
-/* Estilos para el Carrusel */
-.categoria-seccion {
-  margin-bottom: 30px;
-  width: 100%;
-}
-
-.categoria-titulo {
-  font-size: 20px;
-  color: #2c3e50;
-  border-bottom: 2px solid #3498db;
-  padding-bottom: 5px;
-  margin-bottom: 15px;
-  text-transform: uppercase;
-}
-
-.carousel-wrapper {
-  display: flex;
-  overflow-x: auto;
-  gap: 15px;
-  padding: 10px 5px;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch; /* Suavidad en móviles */
-}
-
-/* Ocultar barra de scroll pero mantener funcionalidad */
-.carousel-wrapper::-webkit-scrollbar {
-  height: 6px;
-}
-.carousel-wrapper::-webkit-scrollbar-thumb {
-  background: #bdc3c7;
-  border-radius: 10px;
-}
-
-.promo-card {
-  flex: 0 0 auto; /* Evita que las tarjetas se encojan */
-  width: 200px;   /* Ancho fijo para el carrusel */
-}
-
-
+  @media (max-width: 380px) {
+    .promo-card { width: 100%; max-width: none; }
+  }
 </style>
+
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -457,92 +560,190 @@
 </head>
 
 <body>
+
 <header>
-  <img src="https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png" alt="Logo Distribuidora">
-  🛍️ Tienda de Promociones de Distribuidora Allana
+  <div class="header-left">
+    <img src="https://ejbqlejlgprvwzrptojo.supabase.co/storage/v1/object/public/promo_images/logodistribuidora.png" alt="Logo">
+    <div class="header-title">
+      Distribuidora Allana
+      <small>Tienda de Promociones</small>
+    </div>
+  </div>
+  <button id="headerCarritoBadge" onclick="scrollAlCarrito()">🛒 <span id="headerCarritoCount">0</span> — <span id="headerCarritoTotal">$0</span></button>
 </header>
 
 <main>
-  <h3>🛒 Mi Pedido (<span id="carritoCount">0</span>)</h3>
-  <div id="carritoLista"><span style="color:#888;">No hay productos seleccionados</span></div>
-  <hr>
-  <p><b>Total:</b> <span id="carritoTotal">$0.00</span></p>
 
-  
-<h3>Datos del Cliente</h3>
-  <div style="display:flex;gap:10px; flex-wrap:wrap;">
-    <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" required style="flex:1;">
-    <button onclick="buscarClientePorNombre()" id="buscarClienteBtn" style="background:#f39c12; color:white; border:none; border-radius:8px; padding:12px 16px; margin-top:12px; cursor:pointer;">Buscar Cliente</button>
+  <!-- ① CATÁLOGO (primero para el flujo del vendedor) -->
+  <div class="seccion-catalogo">
+    <h2>🏷️ Seleccionar productos</h2>
+    <select id="categoriaSelect" onchange="cargarPromosPorCategoria()">
+      <option value="">Seleccionar categoría...</option>
+    </select>
+    <input id="busquedaPromo" type="text" placeholder="Buscar producto por nombre...">
+    <div id="productosContainer" class="productos-container"></div>
   </div>
 
-  <div style="display:flex;gap:10px; flex-wrap:wrap;">
-    <input id="dni" type="text" placeholder="DNI sin puntos" style="flex:1;">
-    <button onclick="consultarPedidosCliente()" id="consultarPedidosCliente" style="border-radius: 8px; padding: 12px 16px; margin-top: 12px; cursor: pointer;">Consultar pedidos ya cargados</button>
+  <!-- ② PRESUPUESTO -->
+  <div id="seccionCarrito">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <h3 style="margin:0;">📋 Presupuesto (<span id="carritoCount">0</span> ítems)</h3>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table id="tablaPresupuesto" style="width:100%;border-collapse:collapse;font-size:14px;">
+        <thead>
+          <tr style="background:#2980b9;color:white;">
+            <th style="padding:10px 8px;text-align:left;min-width:200px;">Producto</th>
+            <th style="padding:10px 8px;text-align:center;width:90px;">Cant.</th>
+            <th style="padding:10px 8px;text-align:right;width:100px;">P. Unit.</th>
+            <th style="padding:10px 8px;text-align:right;width:100px;">Subtotal</th>
+            <th style="padding:10px 8px;text-align:center;width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="carritoLista">
+          <tr id="filaVacia">
+            <td colspan="5" style="text-align:center;padding:20px;color:#888;font-size:14px;">
+              Agregá productos desde el catálogo de arriba
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr style="background:#f8fafc;border-top:2px dashed #cbd5e1;">
+            <td style="padding:8px;" colspan="5">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div style="position:relative;flex:2;min-width:180px;">
+                  <input id="inputNuevoProducto" type="text"
+                    placeholder="Escribir o buscar producto..."
+                    style="width:100%;padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;margin:0;"
+                    oninput="buscarProductoEnLinea(this.value)"
+                    onkeydown="if(event.key==='Escape') cerrarSugerencias()">
+                  <div id="sugerenciasProducto" style="display:none;position:fixed;background:white;border:1.5px solid #2980b9;border-radius:8px;z-index:99999;max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.25);"></div>
+                </div>
+                <input id="inputNuevaCantidad" type="number" value="1" min="1"
+                  style="width:70px;padding:9px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;text-align:center;margin:0;">
+                <input id="inputNuevoPrecio" type="number" step="0.01" placeholder="Precio"
+                  style="width:90px;padding:9px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;text-align:right;margin:0;">
+                <button onclick="agregarLineaManual()"
+                  style="padding:9px 16px;background:#2980b9;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">+ Agregar</button>
+              </div>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div id="panelTotales" style="display:none;margin-top:16px;border-top:2px solid #e2e8f0;padding-top:14px;">
+      <div style="display:flex;justify-content:flex-end;">
+        <div style="min-width:280px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:15px;">
+            <span style="color:#64748b;">Subtotal</span>
+            <span id="subtotalValor" style="font-weight:600;">$0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:15px;border-top:1px solid #e2e8f0;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="color:#64748b;">Descuento</span>
+              <input id="inputDescuento" type="number" value="0" min="0" max="100" step="0.5"
+                style="width:55px;padding:4px 6px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:14px;text-align:center;margin:0;"
+                oninput="recalcularTotales()">
+              <span style="color:#64748b;font-size:13px;">%</span>
+            </div>
+            <span id="descuentoValor" style="color:#e74c3c;font-weight:600;">-$0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #e2e8f0;font-size:16px;">
+            <span style="color:#64748b;">Total calculado</span>
+            <span id="totalCalculadoValor" style="font-weight:700;color:#1e293b;">$0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;margin-top:6px;">
+            <span style="font-weight:700;font-size:16px;color:#166534;">TOTAL FINAL</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="color:#166534;font-weight:700;font-size:16px;">$</span>
+              <input id="carritoTotal" type="number" step="0.01"
+                style="width:110px;padding:6px 8px;border:1.5px solid #86efac;border-radius:8px;font-size:18px;font-weight:800;color:#166534;text-align:right;background:white;margin:0;"
+                oninput="guardarEstadoLocal()">
+            </div>
+          </div>
+          <p style="font-size:11px;color:#94a3b8;text-align:right;margin:4px 0 0;">Podes editar el total final para redondear</p>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <select id="clienteLocalidad" required>
-    <option value="">Seleccionar localidad...</option>
-  </select>
+  <!-- ③ DATOS DEL CLIENTE -->
+  <div class="seccion-cliente">
+    <h3>👤 Datos del cliente</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input id="clienteNombre" type="text" placeholder="Nombre y Apellido" style="flex:1;min-width:180px;">
+      <button onclick="buscarClientePorNombre()" class="btn-buscar-cliente">Buscar</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input id="dni" type="text" placeholder="DNI sin puntos" style="flex:1;min-width:180px;">
+      <button onclick="consultarPedidosCliente()" id="consultarPedidosCliente" style="border-radius:8px;padding:12px 14px;margin-top:10px;cursor:pointer;">Ver pedidos</button>
+    </div>
+    <select id="clienteLocalidad">
+      <option value="">Seleccionar localidad...</option>
+    </select>
+  </div>
 
-<button type="button" onclick="crearVisitaSinVenta()" style="background: #e67e22; color: white; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px;">
-    🚶‍♂️ Cliente Visitado sin Ventas (Solo Cobranza)
-</button>
-
-  <button class="btn-confirmar" onclick="confirmarPedido()">Confirmar y Enviar Pedido</button>
-  <hr>
-
-  <h2>Seleccione una Categoría</h2>
-  <select id="categoriaSelect" onchange="cargarPromosPorCategoria()">
-    <option value="">Seleccionar categoría...</option>
-  </select>
-
-  <h3>Buscar Promoción</h3>
-  <input id="busquedaPromo" type="text" placeholder="Escriba el nombre de la promoción...">
-
-  <div id="productosContainer" class="productos-container"></div>
+  <!-- ④ BOTONES DE ACCIÓN -->
+  <button type="button" onclick="crearVisitaSinVenta()" class="btn-visita">
+    🚶 Cliente Visitado sin Ventas (Solo Cobranza)
+  </button>
+  <button class="btn-confirmar" onclick="confirmarPedido()">
+    ✅ Confirmar y Enviar Pedido
+  </button>
 
   <div id="carritoResumen"></div>
 </main>
 
 <footer>Distribuidora Allana © 2025</footer>
 
+<!-- Carrito sticky fondo (mobile) -->
+<div id="carritoSticky" onclick="scrollAlCarrito()">
+  <div class="sticky-info">🛒 <span id="stickyCount">0</span> producto(s)</div>
+  <div class="sticky-total" id="stickyTotal">$0.00</div>
+  <button class="sticky-btn" onclick="event.stopPropagation();scrollAlCarrito()">Ver carrito ↑</button>
+</div>
+
+<!-- WhatsApp -->
+<a href="https://wa.me/5493854784659?text=Hola%20te%20escribo%20de%20tu%20página%20de%20pedidos" target="_blank"
+   style="position:fixed;bottom:80px;right:20px;background:#25D366;color:white;border-radius:50%;width:56px;height:56px;display:flex;justify-content:center;align-items:center;text-decoration:none;box-shadow:0 3px 8px rgba(0,0,0,0.3);z-index:501;">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" style="width:52px;height:52px;">
+</a>
+
+<!-- Modal confirmación pedido -->
 <div id="modalPDF">
   <div class="modal-content">
-    <p>✅ Pedido enviado correctamente.</p>
-    <div style="display: flex; flex-direction: column; gap: 10px;">
-      <button onclick="abrirControlPedido()" style="background:#3498db; color:white;">🔍 Ver y controlar el pedido</button>
-      <button onclick="mostrarFormularioPago()" style="background:#f39c12; color:white; padding: 14px 22px; border-radius: 10px; border:none; cursor:pointer;">
-  💰 Registrar Pago del Cliente
-</button> 
-      
-      <div style="display: flex; justify-content: center; gap: 10px;">
-        <button onclick="cerrarModalPDF()" style="background:#e74c3c; color:white;">Cerrar</button>
-        <button onclick="guardarYDescargarDirecto()" style="background:#27ae60; color:white;">Descargar PDF directo</button>
+    <p style="font-size:18px;margin-top:0;">✅ Pedido enviado correctamente</p>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button onclick="abrirControlPedido()" style="background:#3498db;color:white;">🔍 Ver y controlar el pedido</button>
+      <button onclick="mostrarFormularioPago()" style="background:#f39c12;color:white;">💰 Registrar Pago del Cliente</button>
+      <div style="display:flex;justify-content:center;gap:10px;">
+        <button onclick="cerrarModalPDF()" style="background:#e74c3c;color:white;">Cerrar</button>
+        <button onclick="guardarYDescargarDirecto()" style="background:#27ae60;color:white;">Descargar PDF</button>
       </div>
     </div>
   </div>
 </div>
 
-
-<div id="modalControlPedido" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:3000; padding: 15px;">
-  <div class="modal-content" style="background: white; padding: 25px; border-radius: 14px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;">
+<!-- Modal control preparación -->
+<div id="modalControlPedido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);justify-content:center;align-items:center;z-index:3000;padding:15px;">
+  <div style="background:white;padding:25px;border-radius:14px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto;">
     <h2 style="margin-top:0;">📋 Control de Preparación</h2>
-    <p style="font-size: 14px; color: #555;">Marque los productos a medida que los separa:</p>
+    <p style="font-size:14px;color:#555;">Marque los productos a medida que los separa:</p>
     <hr>
-    <div id="listaControlCheck" style="text-align: left; margin: 20px 0;">
-      </div>
+    <div id="listaControlCheck" style="text-align:left;margin:20px 0;"></div>
     <hr>
-    <div id="contenedorBotonesControl" style="display: flex; flex-direction: column; gap: 10px;">
-        <button id="btnFinalizarControl" disabled onclick="descargarPDFDesdeControl()" style="background:#ccc; color:white; padding: 15px; border-radius: 10px; border:none; font-weight:bold; cursor: not-allowed; font-size: 16px;">
-            FINALIZAR Y DESCARGAR PDF
-        </button>
-        <button onclick="cerrarControlPedido()" style="background:none; border:none; color:#e74c3c; cursor:pointer; text-decoration: underline;">Cancelar</button>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button id="btnFinalizarControl" disabled onclick="descargarPDFDesdeControl()" style="background:#ccc;color:white;padding:15px;border-radius:10px;border:none;font-weight:bold;cursor:not-allowed;font-size:15px;">
+        FINALIZAR Y DESCARGAR PDF
+      </button>
+      <button onclick="cerrarControlPedido()" style="background:none;border:none;color:#e74c3c;cursor:pointer;text-decoration:underline;">Cancelar</button>
     </div>
   </div>
 </div>
 
-  
-
+<!-- Modal imagen ampliada -->
 <div id="modalImagen">
   <div class="modal-content-img">
     <button class="close-button" onclick="cerrarModalImagen()">Cerrar</button>
@@ -550,55 +751,44 @@
   </div>
 </div>
 
-<a href="https://wa.me/5493854784659?text=Hola%20te%20escribo%20de%20tu%20página%20de%20pedidos" target="_blank"
-   style="position: fixed; bottom: 20px; right: 20px; background-color: #25D366; color: white; border-radius: 50%; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; text-decoration: none; font-size: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 1000;">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" style="width:60px; height:60px;">
-</a>
-
-
-<div id="modalPago" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:4000; padding: 15px;">
-  <div class="modal-content" style="background: white; padding: 25px; border-radius: 14px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;">
-    <h2 style="margin-top:0; color: #2c3e50;">💰 Registrar Pagos</h2>
-    <p style="font-size: 14px; color: #666;">Cliente: <span id="pagoClienteNombreTexto" style="font-weight: bold;"></span></p>
+<!-- Modal pagos -->
+<div id="modalPago" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);justify-content:center;align-items:center;z-index:4000;padding:15px;">
+  <div style="background:white;padding:25px;border-radius:14px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto;">
+    <h2 style="margin-top:0;color:#2c3e50;">💰 Registrar Pagos</h2>
+    <p style="font-size:14px;color:#666;">Cliente: <span id="pagoClienteNombreTexto" style="font-weight:bold;"></span></p>
     <hr>
-    
-    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-        <div style="flex: 1;">
-          <label style="font-size: 12px;">Monto:</label>
-          <input type="number" id="inputMontoIndividual" placeholder="0.00" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+    <div id="historialPagosPrevios"></div>
+    <div style="background:#f8f9fa;padding:14px;border-radius:8px;margin-bottom:14px;">
+      <div style="display:flex;gap:10px;margin-bottom:10px;">
+        <div style="flex:1;">
+          <label style="font-size:12px;color:#666;">Monto:</label>
+          <input type="number" id="inputMontoIndividual" placeholder="0.00">
         </div>
-        <div style="flex: 1;">
-          <label style="font-size: 12px;">Método:</label>
-          <select id="inputMetodoIndividual" onchange="toggleDestinatarioMulti()" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+        <div style="flex:1;">
+          <label style="font-size:12px;color:#666;">Método:</label>
+          <select id="inputMetodoIndividual" onchange="toggleDestinatarioMulti()">
             <option value="Efectivo">Efectivo</option>
             <option value="Transferencia">Transferencia</option>
           </select>
         </div>
       </div>
-      
-      <div id="campoDestinatarioMulti" style="display:none; margin-bottom: 10px;">
-        <label style="font-size: 12px;">Destinatario:</label>
-        <input type="text" id="inputDestinatarioIndividual" placeholder="Nombre titular cuenta" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;">
+      <div id="campoDestinatarioMulti" style="display:none;margin-bottom:10px;">
+        <label style="font-size:12px;color:#666;">Destinatario:</label>
+        <input type="text" id="inputDestinatarioIndividual" placeholder="Nombre titular cuenta">
       </div>
-      
-      <button onclick="agregarPagoALista()" style="width: 100%; background: #3498db; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold;">+ Agregar este pago</button>
+      <button onclick="agregarPagoALista()" style="width:100%;background:#3498db;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:bold;">+ Agregar este pago</button>
     </div>
-
-    <div id="listaPagosAgregados" style="margin-bottom: 15px; border: 1px solid #eee; border-radius: 8px; padding: 10px; min-height: 50px;">
-      <p style="color: #999; font-size: 13px; text-align: center;">No hay pagos agregados aún</p>
+    <div id="listaPagosAgregados" style="margin-bottom:14px;border:1px solid #eee;border-radius:8px;padding:10px;min-height:50px;">
+      <p style="color:#999;font-size:13px;text-align:center;">No hay pagos agregados aún</p>
     </div>
-
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
       <span>Total Pedido: <b id="pagoTotalPedido">$0</b></span>
       <span>Restante: <b id="pagoRestante">$0</b></span>
     </div>
-
-    <button onclick="procesarRegistroPagoMulti()" id="btnConfirmarPagoFinal" disabled style="width:100%; background:#ccc; color:white; padding: 15px; border-radius: 10px; border:none; font-weight:bold; cursor:not-allowed;">CONFIRMAR Y FINALIZAR</button>
-    <button onclick="cerrarModalPago()" style="width:100%; background:none; border:none; color:#e74c3c; cursor:pointer; margin-top:10px; text-decoration:underline;">Cancelar</button>
+    <button onclick="procesarRegistroPagoMulti()" id="btnConfirmarPagoFinal" disabled style="width:100%;background:#ccc;color:white;padding:15px;border-radius:10px;border:none;font-weight:bold;cursor:not-allowed;">CONFIRMAR Y FINALIZAR</button>
+    <button onclick="cerrarModalPago()" style="width:100%;background:none;border:none;color:#e74c3c;cursor:pointer;margin-top:10px;text-decoration:underline;">Cancelar</button>
   </div>
 </div>
-
 
 
 <script>
@@ -628,12 +818,15 @@ let pedidoExistenteId = null;
 
 // --- PERSISTENCIA DE DATOS ---
 function guardarEstadoLocal() {
+  const ctEl = document.getElementById("carritoTotal");
   const estado = {
     pedidoTemp: pedidoTemp,
     clienteNombre: document.getElementById("clienteNombre").value,
     dni: document.getElementById("dni").value,
     clienteLocalidad: document.getElementById("clienteLocalidad").value,
-    pedidoExistenteId: pedidoExistenteId
+    pedidoExistenteId: pedidoExistenteId,
+    totalFinal: ctEl ? ctEl.value : null,
+    descuento: document.getElementById("inputDescuento")?.value || "0"
   };
   localStorage.setItem("pedido_respaldo", JSON.stringify(estado));
 }
@@ -657,8 +850,18 @@ function guardarEstadoLocal() {
         if(datos.clienteLocalidad) document.getElementById("clienteLocalidad").value = datos.clienteLocalidad;
       }, 1000);
 
+      // Restaurar descuento y total final si existían
+      if (datos.descuento) {
+        const dEl = document.getElementById("inputDescuento");
+        if (dEl) dEl.value = datos.descuento;
+      }
       // ¡MUY IMPORTANTE! Dibujar el carrito recuperado
       renderCarritoCliente();
+      // Restaurar total editado manualmente (después del render)
+      if (datos.totalFinal) {
+        const ctEl = document.getElementById("carritoTotal");
+        if (ctEl) ctEl.value = datos.totalFinal;
+      }
     } catch (e) {
       console.error("Error recuperando datos guardados", e);
     }
@@ -992,59 +1195,235 @@ function carritoLista(id, nombre, precio, precio_anterior = null, cantidadAAgreg
 }
 
 function modificarCantidad(id, cambio) {
-  const producto = pedidoTemp.find(p => p.id === id);
+  const producto = pedidoTemp.find(p => String(p.id) === String(id));
   if (!producto) return;
   producto.cantidad += cambio;
-  if (producto.cantidad <= 0) pedidoTemp = pedidoTemp.filter(p => p.id !== id);
+  if (producto.cantidad <= 0) pedidoTemp = pedidoTemp.filter(p => String(p.id) !== String(id));
+  renderCarritoCliente();
+}
+
+// ── Búsqueda de productos en línea (para la fila de agregar) ──
+let buscarLineaTimer;
+async function buscarProductoEnLinea(texto) {
+  clearTimeout(buscarLineaTimer);
+  const sug = document.getElementById("sugerenciasProducto");
+  if (!texto || texto.length < 2) { sug.style.display = "none"; return; }
+
+  buscarLineaTimer = setTimeout(async () => {
+    const { data, error } = await sb
+      .from("promociones")
+      .select("id, nombre, precio")
+      .ilike("nombre", `%${texto}%`)
+      .limit(12);
+    if (error || !data || data.length === 0) { sug.style.display = "none"; return; }
+
+    sug.innerHTML = data.map(p => `
+      <div onclick="seleccionarSugerencia(${p.id}, '${p.nombre.replace(/'/g,"\'")}', ${p.precio})"
+        style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:14px;display:flex;justify-content:space-between;align-items:center;"
+        onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
+        <span>${p.nombre}</span>
+        <span style="color:#2980b9;font-weight:700;font-size:13px;">$${p.precio.toFixed(2)}</span>
+      </div>
+    `).join("");
+    sug.style.display = "block";
+    posicionarSugerencias();
+  }, 250);
+}
+
+// Posiciona el listado con position:fixed, anclado a la posición actual
+// del input en la pantalla (viewport), para que siempre quede visible
+// por encima de todo el contenido, sin depender del scroll de la página.
+function posicionarSugerencias() {
+  const input = document.getElementById("inputNuevoProducto");
+  const sug = document.getElementById("sugerenciasProducto");
+  const rect = input.getBoundingClientRect();
+  const margen = 4;
+  const alturaListado = Math.min(260, sug.scrollHeight || 260);
+
+  const espacioAbajo = window.innerHeight - rect.bottom;
+  const espacioArriba = rect.top;
+
+  sug.style.left = rect.left + "px";
+  sug.style.width = rect.width + "px";
+
+  if (espacioAbajo < alturaListado && espacioArriba > espacioAbajo) {
+    // No entra abajo: se abre hacia arriba, encima del input
+    sug.style.top = "auto";
+    sug.style.bottom = (window.innerHeight - rect.top + margen) + "px";
+    sug.style.maxHeight = Math.min(260, espacioArriba - margen * 2) + "px";
+  } else {
+    sug.style.bottom = "auto";
+    sug.style.top = (rect.bottom + margen) + "px";
+    sug.style.maxHeight = Math.min(260, espacioAbajo - margen * 2) + "px";
+  }
+}
+
+// Si la página (o el panel de ítems) se desplaza mientras el listado
+// está abierto, lo recalculamos para que siga anclado al input.
+window.addEventListener("scroll", () => {
+  const sug = document.getElementById("sugerenciasProducto");
+  if (sug && sug.style.display === "block") posicionarSugerencias();
+}, true);
+
+function seleccionarSugerencia(id, nombre, precio) {
+  document.getElementById("inputNuevoProducto").value = nombre;
+  document.getElementById("inputNuevoPrecio").value = precio.toFixed(2);
+  document.getElementById("inputNuevoPrecio").dataset.productoId = id;
+  document.getElementById("inputNuevoPrecio").dataset.productoNombre = nombre;
+  cerrarSugerencias();
+}
+
+function cerrarSugerencias() {
+  document.getElementById("sugerenciasProducto").style.display = "none";
+}
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#inputNuevoProducto") && !e.target.closest("#sugerenciasProducto")) {
+    cerrarSugerencias();
+  }
+});
+
+window.addEventListener("resize", () => {
+  const sug = document.getElementById("sugerenciasProducto");
+  if (sug && sug.style.display === "block") posicionarSugerencias();
+});
+
+function agregarLineaManual() {
+  const nombre = document.getElementById("inputNuevoProducto").value.trim();
+  const cantidad = parseInt(document.getElementById("inputNuevaCantidad").value) || 1;
+  const precio = parseFloat(document.getElementById("inputNuevoPrecio").value);
+  const idDataset = document.getElementById("inputNuevoPrecio").dataset.productoId;
+
+  if (!nombre) { alert("Ingresá el nombre del producto."); return; }
+  if (isNaN(precio) || precio < 0) { alert("Ingresá un precio válido."); return; }
+
+  // ID: si vino de sugerencia usa ese id, sino genera uno temporal por nombre
+  const id = idDataset ? parseInt(idDataset) : ("manual_" + nombre.toLowerCase().replace(/\s+/g,"_"));
+
+  const index = pedidoTemp.findIndex(item => String(item.id) === String(id));
+  if (index !== -1) {
+    pedidoTemp[index].cantidad += cantidad;
+  } else {
+    pedidoTemp.push({ id, nombre, precio, precio_anterior: null, cantidad });
+  }
+
+  // Limpiar fila de entrada
+  document.getElementById("inputNuevoProducto").value = "";
+  document.getElementById("inputNuevaCantidad").value = "1";
+  document.getElementById("inputNuevoPrecio").value = "";
+  delete document.getElementById("inputNuevoPrecio").dataset.productoId;
+  delete document.getElementById("inputNuevoPrecio").dataset.productoNombre;
+
   renderCarritoCliente();
 }
 
 function renderCarritoCliente() {
-  const contenedor = document.getElementById("carritoLista");
-  if (!contenedor) return;
+  const tbody = document.getElementById("carritoLista");
+  if (!tbody) return;
+
+  const panelTotales = document.getElementById("panelTotales");
 
   if (pedidoTemp.length === 0) {
-    contenedor.innerHTML = "<span style='color:#888;'>🛒 No hay productos seleccionados</span>";
-    document.getElementById("carritoTotal").textContent = "$0.00";
+    tbody.innerHTML = `<tr id="filaVacia"><td colspan="5" style="text-align:center;padding:20px;color:#888;font-size:14px;">Agregá productos desde el catálogo o usá el buscador de abajo</td></tr>`;
+    if (panelTotales) panelTotales.style.display = "none";
+    document.getElementById("carritoCount").textContent = "0";
+    const ct = document.getElementById("carritoTotal");
+    if (ct) ct.value = "0.00";
+    guardarEstadoLocal();
     return;
   }
 
-  contenedor.innerHTML = pedidoTemp.map((p, index) => `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;padding:10px;border:1px solid #ccc;border-radius:10px; background:#fff; flex-wrap:wrap;">
-      <div style="flex:2; font-weight:bold; color:#333;">${p.nombre}</div>
-      
-      <div style="display:flex; align-items:center; gap:6px;">
-        <input type="number" value="${p.precio.toFixed(2)}" 
-          style="width:70px; padding:5px; border:1px solid #ddd; border-radius:4px;"
+  tbody.innerHTML = pedidoTemp.map((p, index) => `
+    <tr style="border-bottom:1px solid #f1f5f9;${index % 2 === 0 ? "background:#fff" : "background:#f8fafc"}">
+      <td style="padding:10px 8px;">
+        <span style="font-weight:600;color:#1e293b;">${p.nombre}</span>
+      </td>
+      <td style="padding:8px;text-align:center;width:90px;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+          <button onclick="modificarCantidad('${p.id}', -1)"
+            style="background:#e74c3c;color:white;border:none;border-radius:4px;width:26px;height:26px;cursor:pointer;font-size:14px;font-weight:bold;line-height:1;">−</button>
+          <input type="number" value="${p.cantidad}" min="1"
+            style="width:46px;padding:3px;border:1px solid #cbd5e1;border-radius:5px;font-size:14px;text-align:center;margin:0;font-weight:600;"
+            onchange="actualizarCantidadEnCarrito('${p.id}', this.value)">
+          <button onclick="modificarCantidad('${p.id}', 1)"
+            style="background:#27ae60;color:white;border:none;border-radius:4px;width:26px;height:26px;cursor:pointer;font-size:14px;font-weight:bold;line-height:1;">+</button>
+        </div>
+      </td>
+      <td style="padding:8px;text-align:right;width:100px;">
+        <input type="number" value="${p.precio.toFixed(2)}" step="0.01" min="0"
+          style="width:80px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:14px;text-align:right;margin:0;"
           onchange="actualizarPrecioEnCarrito(${index}, this.value)">
-      </div>
-
-      <div style="display:flex; align-items:center; gap:6px;">
-        <button onclick="modificarCantidad(${p.id}, -1)" style="background:#e74c3c;color:white;border:none;border-radius:4px;padding:4px 8px; cursor:pointer;">−</button>
-        <span>${p.cantidad}</span>
-        <button onclick="modificarCantidad(${p.id}, 1)" style="background:#27ae60;color:white;border:none;border-radius:4px;padding:4px 8px; cursor:pointer;">+</button>
-      </div>
-
-      <div style="width:70px; text-align:right; font-weight:bold; color:#e74c3c;">
+      </td>
+      <td style="padding:8px;text-align:right;font-weight:700;color:#1e293b;width:100px;">
         $${(p.precio * p.cantidad).toFixed(2)}
-      </div>
-    </div>
+      </td>
+      <td style="padding:8px;text-align:center;width:40px;">
+        <button onclick="eliminarItemCarrito('${p.id}')"
+          style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:18px;line-height:1;padding:2px 4px;"
+          title="Eliminar">×</button>
+      </td>
+    </tr>
   `).join("");
 
-  const total = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
-  document.getElementById("carritoTotal").textContent = `$${total.toFixed(2)}`;
+  if (panelTotales) panelTotales.style.display = "block";
+  document.getElementById("carritoCount").textContent = pedidoTemp.reduce((s,p) => s + p.cantidad, 0);
+  recalcularTotales();
   guardarEstadoLocal();
 }
 
+function recalcularTotales() {
+  const subtotal = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
+  const descPct  = parseFloat(document.getElementById("inputDescuento")?.value) || 0;
+  const descMonto = subtotal * (descPct / 100);
+  const totalCalc = subtotal - descMonto;
+
+  const subtotalEl = document.getElementById("subtotalValor");
+  const descEl     = document.getElementById("descuentoValor");
+  const calcEl     = document.getElementById("totalCalculadoValor");
+  const finalEl    = document.getElementById("carritoTotal");
+
+  if (subtotalEl) subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
+  if (descEl)     descEl.textContent = `-$${descMonto.toFixed(2)}`;
+  if (calcEl)     calcEl.textContent = `$${totalCalc.toFixed(2)}`;
+  if (finalEl)    finalEl.value = totalCalc.toFixed(2);
+
+  // Sticky y badge header
+  const cantidad = pedidoTemp.reduce((s,p) => s + p.cantidad, 0);
+  const badge = document.getElementById("headerCarritoBadge");
+  if (badge) {
+    document.getElementById("headerCarritoCount").textContent = cantidad;
+    document.getElementById("headerCarritoTotal").textContent = `$${totalCalc.toFixed(2)}`;
+    badge.style.display = cantidad > 0 ? "block" : "none";
+  }
+  const sticky = document.getElementById("carritoSticky");
+  if (sticky) {
+    sticky.style.display = cantidad > 0 ? "flex" : "none";
+    document.getElementById("stickyCount").textContent  = cantidad;
+    document.getElementById("stickyTotal").textContent  = `$${totalCalc.toFixed(2)}`;
+  }
+}
+
+function eliminarItemCarrito(id) {
+  pedidoTemp = pedidoTemp.filter(p => String(p.id) !== String(id));
+  renderCarritoCliente();
+}
+
+function actualizarCantidadEnCarrito(id, nuevaCantidad) {
+  const cant = parseInt(nuevaCantidad);
+  if (isNaN(cant) || cant <= 0) { pedidoTemp = pedidoTemp.filter(p => String(p.id) !== String(id)); }
+  else { const prod = pedidoTemp.find(p => String(p.id) === String(id)); if (prod) prod.cantidad = cant; }
+  renderCarritoCliente();
+}
 
 function actualizarPrecioEnCarrito(index, nuevoPrecio) {
   const precio = parseFloat(nuevoPrecio);
   if (!isNaN(precio) && precio >= 0) {
     pedidoTemp[index].precio = precio;
-    renderCarritoCliente(); // Refresca los totales al cambiar el precio
+    recalcularTotales();
+    guardarEstadoLocal();
   } else {
-    alert("Por favor, ingrese un precio válido.");
-    renderCarritoCliente(); // Resetea si el valor es inválido
+    alert("Ingresá un precio válido.");
+    renderCarritoCliente();
   }
 }
 
@@ -1174,7 +1553,10 @@ async function confirmarPedido() {
   // Feedback visual opcional: cambia el texto del botón si tienes acceso a él
   // document.getElementById("btnConfirmar").innerText = "Procesando...";
 
-  const totalCalculado = pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
+  // Total final: respeta edición manual y descuento aplicado
+  const totalInputEl = document.getElementById("carritoTotal");
+  const totalCalculado = totalInputEl ? (parseFloat(totalInputEl.value) || 0)
+    : pedidoTemp.reduce((sum, p) => sum + p.precio * p.cantidad, 0);
   const fechaISO = new Date().toISOString();
 
   try {
@@ -1283,7 +1665,8 @@ function reiniciarPedido() {
     
     // 4. Limpiar contenedores
     document.getElementById("productosContainer").innerHTML = "";
-    document.getElementById("carritoTotal").textContent = "$0.00";
+    const ctEl = document.getElementById("carritoTotal");
+    if (ctEl) { ctEl.value = "0.00"; }
     document.getElementById("carritoCount").textContent = "0";
 
     // 5. Refrescar la vista del carrito
@@ -1322,7 +1705,7 @@ async function mostrarFormularioPago() {
     pagosPreviosBD = [];
     
     document.getElementById("pagoClienteNombreTexto").innerText = nombre;
-    const total = parseFloat(document.getElementById("carritoTotal").textContent.replace('$', ''));
+    const _ctEl2 = document.getElementById("carritoTotal"); const total = _ctEl2 ? (parseFloat(_ctEl2.value) || 0) : 0;
     document.getElementById("pagoTotalPedido").innerText = `$${total.toFixed(2)}`;
 
     try {
@@ -1453,7 +1836,9 @@ async function procesarRegistroPagoMulti() {
     }
 
     // Calculamos el total aquí para que esté disponible para el PDF y actualizaciones
-    const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
+    const _ctEl = document.getElementById("carritoTotal");
+  const totalPedido = _ctEl ? (parseFloat(_ctEl.value) || 0)
+    : pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
 
     const nuevosPagos = pagosTemporales.map(p => ({
         monto: p.monto,
@@ -1584,7 +1969,9 @@ function descargarPDF(esPago = false, listaPagos = []) {
   const fecha = new Date().toLocaleString("es-AR");
 
   // Cálculos de productos
-  const totalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
+  const _ctEl = document.getElementById("carritoTotal");
+  const totalPedido = _ctEl ? (parseFloat(_ctEl.value) || 0)
+    : pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
   let ahorroTotal = 0;
   
   const productos = pedidoTemp.map(p => {
