@@ -816,23 +816,36 @@ let todasLasPromos = [];
 let pedidoTemp = [];
 let pedidoExistenteId = null;
 
+// --- DIAGNÓSTICO: si algo revienta en silencio (típico en el celular),
+// esto lo muestra en pantalla en vez de dejar la app "trabada" sin aviso.
+window.addEventListener("error", (e) => {
+  console.error("Error no controlado:", e.error || e.message);
+  alert("⚠️ Ocurrió un error inesperado:\n" + (e.message || e.error) + "\nContale esto al desarrollador (podés hacer captura de pantalla).");
+});
+
 
 
 
 
 // --- PERSISTENCIA DE DATOS ---
 function guardarEstadoLocal() {
-  const ctEl = document.getElementById("carritoTotal");
-  const estado = {
-    pedidoTemp: pedidoTemp,
-    clienteNombre: document.getElementById("clienteNombre").value,
-    dni: document.getElementById("dni").value,
-    clienteLocalidad: document.getElementById("clienteLocalidad").value,
-    pedidoExistenteId: pedidoExistenteId,
-    totalFinal: ctEl ? ctEl.value : null,
-    descuento: document.getElementById("inputDescuento")?.value || "0"
-  };
-  localStorage.setItem("pedido_respaldo", JSON.stringify(estado));
+  try {
+    const ctEl = document.getElementById("carritoTotal");
+    const estado = {
+      pedidoTemp: pedidoTemp,
+      clienteNombre: document.getElementById("clienteNombre").value,
+      dni: document.getElementById("dni").value,
+      clienteLocalidad: document.getElementById("clienteLocalidad").value,
+      pedidoExistenteId: pedidoExistenteId,
+      totalFinal: ctEl ? ctEl.value : null,
+      descuento: document.getElementById("inputDescuento")?.value || "0"
+    };
+    localStorage.setItem("pedido_respaldo", JSON.stringify(estado));
+  } catch (e) {
+    // No dejamos que un fallo de localStorage (ej: cuota excedida o modo privado)
+    // rompa el agregado al carrito. Solo lo registramos.
+    console.error("No se pudo guardar el respaldo local:", e);
+  }
 }
 
   function cargarEstadoLocal() {
@@ -1180,22 +1193,37 @@ function cambiarCantidadCard(id, cambio) {
 }
 
 function agregarAlCarritoDesdeCard(id, nombre, precio, precio_anterior) {
-  const cantidadDisplay = document.getElementById(`cantidad-display-${id}`);
-  let cantidad = parseInt(cantidadDisplay.textContent, 10);
-  if (isNaN(cantidad) || cantidad <= 0) cantidad = 1;
+  try {
+    const cantidadDisplay = document.getElementById(`cantidad-display-${id}`);
+    if (!cantidadDisplay) {
+      console.error("No se encontró el display de cantidad para el id:", id);
+      alert("No se pudo agregar el producto (id " + id + "). Probá recargar la página.");
+      return;
+    }
+    let cantidad = parseInt(cantidadDisplay.textContent, 10);
+    if (isNaN(cantidad) || cantidad <= 0) cantidad = 1;
 
-  carritoLista(id, nombre, precio, precio_anterior, cantidad);
-  cantidadDisplay.textContent = 1;
+    carritoLista(id, nombre, Number(precio) || 0, precio_anterior, cantidad);
+    cantidadDisplay.textContent = 1;
+  } catch (e) {
+    console.error("Error al agregar al carrito:", e);
+    alert("⚠️ No se pudo agregar el producto: " + e.message);
+  }
 }
 
-function carritoLista(id, nombre, precio, precio_anterior = null, cantidadAAgregar = 1) { 
-  const index = pedidoTemp.findIndex(item => item.id === id);
-  if (index !== -1) {
-    pedidoTemp[index].cantidad += cantidadAAgregar;
-  } else {
-    pedidoTemp.push({ id, nombre, precio, precio_anterior, cantidad: cantidadAAgregar });
+function carritoLista(id, nombre, precio, precio_anterior = null, cantidadAAgregar = 1) {
+  try {
+    const index = pedidoTemp.findIndex(item => String(item.id) === String(id));
+    if (index !== -1) {
+      pedidoTemp[index].cantidad += cantidadAAgregar;
+    } else {
+      pedidoTemp.push({ id, nombre, precio: Number(precio) || 0, precio_anterior, cantidad: cantidadAAgregar });
+    }
+    renderCarritoCliente();
+  } catch (e) {
+    console.error("Error en carritoLista:", e);
+    alert("⚠️ No se pudo actualizar el carrito: " + e.message);
   }
-  renderCarritoCliente();
 }
 
 function modificarCantidad(id, cambio) {
@@ -1216,19 +1244,23 @@ async function buscarProductoEnLinea(texto) {
   buscarLineaTimer = setTimeout(async () => {
     const { data, error } = await sb
       .from("promociones")
-      .select("id, nombre, precio")
+      .select("id, nombre, precio, stock")
       .ilike("nombre", `%${texto}%`)
       .limit(12);
     if (error || !data || data.length === 0) { sug.style.display = "none"; return; }
 
-    sug.innerHTML = data.map(p => `
+    sug.innerHTML = data.map(p => {
+      const stock = p.stock ?? 0;
+      const stockColor = stock === 0 ? '#e74c3c' : (stock < 5 ? '#f39c12' : '#27ae60');
+      return `
       <div onclick="seleccionarSugerencia(${p.id}, '${p.nombre.replace(/'/g,"\'")}', ${p.precio})"
         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:14px;display:flex;justify-content:space-between;align-items:center;"
         onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
-        <span>${p.nombre}</span>
+        <span>${p.nombre} <span style="color:${stockColor};font-weight:600;">(${stock})</span></span>
         <span style="color:#2980b9;font-weight:700;font-size:13px;">$${p.precio.toFixed(2)}</span>
       </div>
-    `).join("");
+    `;
+    }).join("");
     sug.style.display = "block";
     posicionarSugerencias();
   }, 250);
@@ -1322,57 +1354,66 @@ function agregarLineaManual() {
 }
 
 function renderCarritoCliente() {
-  const tbody = document.getElementById("carritoLista");
-  if (!tbody) return;
+  try {
+    const tbody = document.getElementById("carritoLista");
+    if (!tbody) return;
 
-  const panelTotales = document.getElementById("panelTotales");
+    const panelTotales = document.getElementById("panelTotales");
 
-  if (pedidoTemp.length === 0) {
-    tbody.innerHTML = `<tr id="filaVacia"><td colspan="5" style="text-align:center;padding:20px;color:#888;font-size:14px;">Agregá productos desde el catálogo o usá el buscador de abajo</td></tr>`;
-    if (panelTotales) panelTotales.style.display = "none";
-    document.getElementById("carritoCount").textContent = "0";
-    const ct = document.getElementById("carritoTotal");
-    if (ct) ct.value = "0.00";
+    if (pedidoTemp.length === 0) {
+      tbody.innerHTML = `<tr id="filaVacia"><td colspan="5" style="text-align:center;padding:20px;color:#888;font-size:14px;">Agregá productos desde el catálogo o usá el buscador de abajo</td></tr>`;
+      if (panelTotales) panelTotales.style.display = "none";
+      document.getElementById("carritoCount").textContent = "0";
+      const ct = document.getElementById("carritoTotal");
+      if (ct) ct.value = "0.00";
+      guardarEstadoLocal();
+      return;
+    }
+
+    tbody.innerHTML = pedidoTemp.map((p, index) => {
+      const precioNum = Number(p.precio) || 0;
+      const cantidadNum = Number(p.cantidad) || 0;
+      return `
+      <tr style="border-bottom:1px solid #f1f5f9;${index % 2 === 0 ? "background:#fff" : "background:#f8fafc"}">
+        <td style="padding:10px 8px;">
+          <span style="font-weight:600;color:#1e293b;">${p.nombre}</span>
+        </td>
+        <td style="padding:8px;text-align:center;width:90px;">
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+            <button onclick="modificarCantidad('${p.id}', -1)"
+              style="background:#e74c3c;color:white;border:none;border-radius:4px;width:26px;height:26px;cursor:pointer;font-size:14px;font-weight:bold;line-height:1;">−</button>
+            <input type="number" value="${cantidadNum}" min="1"
+              style="width:46px;padding:3px;border:1px solid #cbd5e1;border-radius:5px;font-size:14px;text-align:center;margin:0;font-weight:600;"
+              onchange="actualizarCantidadEnCarrito('${p.id}', this.value)">
+            <button onclick="modificarCantidad('${p.id}', 1)"
+              style="background:#27ae60;color:white;border:none;border-radius:4px;width:26px;height:26px;cursor:pointer;font-size:14px;font-weight:bold;line-height:1;">+</button>
+          </div>
+        </td>
+        <td style="padding:8px;text-align:right;width:100px;">
+          <input type="number" value="${precioNum.toFixed(2)}" step="0.01" min="0"
+            style="width:80px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:14px;text-align:right;margin:0;"
+            onchange="actualizarPrecioEnCarrito(${index}, this.value)">
+        </td>
+        <td style="padding:8px;text-align:right;font-weight:700;color:#1e293b;width:100px;">
+          $${(precioNum * cantidadNum).toFixed(2)}
+        </td>
+        <td style="padding:8px;text-align:center;width:40px;">
+          <button onclick="eliminarItemCarrito('${p.id}')"
+            style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:18px;line-height:1;padding:2px 4px;"
+            title="Eliminar">×</button>
+        </td>
+      </tr>
+    `;
+    }).join("");
+
+    if (panelTotales) panelTotales.style.display = "block";
+    document.getElementById("carritoCount").textContent = pedidoTemp.reduce((s,p) => s + (Number(p.cantidad) || 0), 0);
+    recalcularTotales();
     guardarEstadoLocal();
-    return;
+  } catch (e) {
+    console.error("Error al renderizar el carrito:", e);
+    alert("⚠️ Error al mostrar el carrito: " + e.message + "\nEl producto puede haberse agregado igual mentalmente, revisá recargando la página.");
   }
-
-  tbody.innerHTML = pedidoTemp.map((p, index) => `
-    <tr style="border-bottom:1px solid #f1f5f9;${index % 2 === 0 ? "background:#fff" : "background:#f8fafc"}">
-      <td style="padding:10px 8px;">
-        <span style="font-weight:600;color:#1e293b;">${p.nombre}</span>
-      </td>
-      <td style="padding:8px;text-align:center;width:90px;">
-        <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
-          <button onclick="modificarCantidad('${p.id}', -1)"
-            style="background:#e74c3c;color:white;border:none;border-radius:4px;width:26px;height:26px;cursor:pointer;font-size:14px;font-weight:bold;line-height:1;">−</button>
-          <input type="number" value="${p.cantidad}" min="1"
-            style="width:46px;padding:3px;border:1px solid #cbd5e1;border-radius:5px;font-size:14px;text-align:center;margin:0;font-weight:600;"
-            onchange="actualizarCantidadEnCarrito('${p.id}', this.value)">
-          <button onclick="modificarCantidad('${p.id}', 1)"
-            style="background:#27ae60;color:white;border:none;border-radius:4px;width:26px;height:26px;cursor:pointer;font-size:14px;font-weight:bold;line-height:1;">+</button>
-        </div>
-      </td>
-      <td style="padding:8px;text-align:right;width:100px;">
-        <input type="number" value="${p.precio.toFixed(2)}" step="0.01" min="0"
-          style="width:80px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:14px;text-align:right;margin:0;"
-          onchange="actualizarPrecioEnCarrito(${index}, this.value)">
-      </td>
-      <td style="padding:8px;text-align:right;font-weight:700;color:#1e293b;width:100px;">
-        $${(p.precio * p.cantidad).toFixed(2)}
-      </td>
-      <td style="padding:8px;text-align:center;width:40px;">
-        <button onclick="eliminarItemCarrito('${p.id}')"
-          style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:18px;line-height:1;padding:2px 4px;"
-          title="Eliminar">×</button>
-      </td>
-    </tr>
-  `).join("");
-
-  if (panelTotales) panelTotales.style.display = "block";
-  document.getElementById("carritoCount").textContent = pedidoTemp.reduce((s,p) => s + p.cantidad, 0);
-  recalcularTotales();
-  guardarEstadoLocal();
 }
 
 function recalcularTotales() {
