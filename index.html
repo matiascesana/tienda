@@ -1816,7 +1816,10 @@ async function mostrarFormularioPago() {
     // La fecha del pago se autocompleta con hoy, pero queda editable
     // por si el usuario está cargando un pago de un día anterior.
     const inputFecha = document.getElementById("inputFechaIndividual");
-    if (inputFecha) inputFecha.value = new Date().toISOString().slice(0, 10);
+    // OJO: usamos la fecha LOCAL, no toISOString() (que da la fecha en UTC).
+    // Argentina es UTC-3, así que cualquier pago cargado desde ~21:00hs en
+    // adelante quedaba con la fecha del día siguiente si se usaba toISOString().
+    if (inputFecha) inputFecha.value = new Date().toLocaleDateString('sv-SE');
 }
 
 function toggleDestinatarioMulti() {
@@ -1945,8 +1948,9 @@ async function procesarRegistroPagoMulti() {
         if (errUpdate) throw errUpdate;
 
         // 4. Éxito y generación de PDF
-        // Usamos descargarPDF(true) que ya configuramos para leer pagosTemporales
-        descargarPDF(true, [...pagosTemporales]);
+        // Usamos descargarPDF(true) que ya configuramos para leer pagosTemporales,
+        // pasando el saldo pendiente real (el mismo que se acaba de guardar en Supabase)
+        descargarPDF(true, [...pagosTemporales], saldoPendienteActualizado);
         
         alert(`✅ Pagos registrados con éxito en el pedido de: ${nombreClienteEnModal}`);
         
@@ -2033,7 +2037,7 @@ async function descargarPDFDesdeControl() {
 }
 
   
-function descargarPDF(esPago = false, listaPagos = []) {
+function descargarPDF(esPago = false, listaPagos = [], saldoPendienteReal = null) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
@@ -2119,7 +2123,24 @@ function descargarPDF(esPago = false, listaPagos = []) {
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
     doc.text(`TOTAL PEDIDO: $${totalPedido.toFixed(2)}`, 130, finalY + 15);
-    
+
+    // --- SALDO PENDIENTE (solo si se registró algún pago en este PDF) ---
+    let offsetSiguiente = finalY + 15;
+    if (esPago && listaPagos && listaPagos.length > 0) {
+      // Si nos pasaron el saldo real ya calculado (total - pagos previos - pagos nuevos)
+      // lo usamos; si no, lo calculamos solo con los pagos de este comprobante.
+      const pagadoEnEstePDF = listaPagos.reduce((acc, p) => acc + (parseFloat(p.monto) || 0), 0);
+      const saldoAMostrar = saldoPendienteReal !== null
+        ? saldoPendienteReal
+        : Math.max(0, totalPedido - pagadoEnEstePDF);
+
+      offsetSiguiente += 8;
+      doc.setFontSize(12);
+      doc.setTextColor(saldoAMostrar > 0 ? 231 : 39, saldoAMostrar > 0 ? 76 : 174, saldoAMostrar > 0 ? 60 : 96);
+      doc.text(`SALDO PENDIENTE: $${saldoAMostrar.toFixed(2)}`, 130, offsetSiguiente);
+      doc.setTextColor(0);
+    }
+
     if (ahorroTotal > 0) {
       doc.setFontSize(11);
       doc.setTextColor(39, 174, 96);
