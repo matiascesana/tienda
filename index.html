@@ -916,7 +916,8 @@ async function crearVisitaSinVenta() {
                 productos: itemVisita,
                 estado: "Visita/Cobranza", // Estado especial para diferenciarlo
                 created_at: new Date().toISOString(),
-                pagos: []
+                pagos: [],
+                saldo_pendiente: 0 // sin pagos aun; el abono se carga después y ahí se recalcula
             }])
             .select();
 
@@ -1633,12 +1634,29 @@ async function confirmarPedido() {
         p_es_edicion: true
       });
 
-      const { error } = await sb.from("pedidos").update(datosPedido).eq("id", pedidoExistenteId);
+      // Recalculamos saldo_pendiente en base al total nuevo y los pagos que ya tenía
+      // el pedido, para que no quede desactualizado si el total cambió al editar.
+      const { data: pedidoPrevio, error: errPrevio } = await sb
+        .from("pedidos")
+        .select("pagos")
+        .eq("id", pedidoExistenteId)
+        .single();
+      if (errPrevio) throw errPrevio;
+
+      const pagosPrevios = Array.isArray(pedidoPrevio?.pagos) ? pedidoPrevio.pagos : [];
+      const totalPagadoPrevio = pagosPrevios.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
+      const saldoRecalculado = Math.max(0, totalCalculado - totalPagadoPrevio);
+
+      const { error } = await sb.from("pedidos")
+        .update({ ...datosPedido, saldo_pendiente: saldoRecalculado })
+        .eq("id", pedidoExistenteId);
       if (error) throw error;
       console.log("Pedido editado y stock sincronizado.");
     } else {
       // --- ESCENARIO: NUEVO ---
-      const { data, error } = await sb.from("pedidos").insert([datosPedido]).select('id');
+      const { data, error } = await sb.from("pedidos")
+        .insert([{ ...datosPedido, pagos: [], saldo_pendiente: totalCalculado }])
+        .select('id');
       if (error) throw error;
       
       const nuevoId = data[0].id;
@@ -1913,10 +1931,15 @@ async function procesarRegistroPagoMulti() {
         let historialActualizado = Array.isArray(pedidoData.pagos) ? pedidoData.pagos : [];
         historialActualizado.push(...nuevosPagos);
 
+        // 2.b Recalculamos el saldo pendiente: total del pedido menos TODOS los pagos
+        // (los que ya tenía + los que se acaban de agregar)
+        const totalPagadoAcumulado = historialActualizado.reduce((acc, p) => acc + (parseFloat(p.monto) || 0), 0);
+        const saldoPendienteActualizado = Math.max(0, totalPedido - totalPagadoAcumulado);
+
         // 3. ACTUALIZACIÓN FINAL
         const { error: errUpdate } = await sb
             .from("pedidos")
-            .update({ pagos: historialActualizado })
+            .update({ pagos: historialActualizado, saldo_pendiente: saldoPendienteActualizado })
             .eq("id", pedidoExistenteId);
 
         if (errUpdate) throw errUpdate;
