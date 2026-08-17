@@ -689,9 +689,16 @@
   <button type="button" onclick="crearVisitaSinVenta()" class="btn-visita">
     🚶 Cliente Visitado sin Ventas (Solo Cobranza)
   </button>
+  <button type="button" onclick="abrirControlPedido(false)" class="btn-confirmar" style="background:var(--c-primary);margin-bottom:8px;">
+    📋 Controlar y Armar Pedido
+  </button>
   <button class="btn-confirmar" onclick="confirmarPedido()">
     ✅ Confirmar y Enviar Pedido
   </button>
+  <p style="font-size:11px;color:#94a3b8;text-align:center;margin:4px 0 14px;">
+    "Controlar y Armar" abre un checklist para ir separando los productos antes de guardar el pedido.<br>
+    "Confirmar y Enviar" guarda el pedido directamente, sin checklist.
+  </p>
 
   <div id="carritoResumen"></div>
 </main>
@@ -716,7 +723,7 @@
   <div class="modal-content">
     <p style="font-size:18px;margin-top:0;">✅ Pedido enviado correctamente</p>
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <button onclick="abrirControlPedido()" style="background:#3498db;color:white;">🔍 Ver y controlar el pedido</button>
+      <button onclick="abrirControlPedido(true)" style="background:#3498db;color:white;">🔍 Ver y controlar el pedido</button>
       <button onclick="mostrarFormularioPago()" style="background:#f39c12;color:white;">💰 Registrar Pago del Cliente</button>
       <div style="display:flex;justify-content:center;gap:10px;">
         <button onclick="cerrarModalPDF()" style="background:#e74c3c;color:white;">Cerrar</button>
@@ -729,16 +736,19 @@
 <!-- Modal control preparación -->
 <div id="modalControlPedido" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);justify-content:center;align-items:center;z-index:3000;padding:15px;">
   <div style="background:white;padding:25px;border-radius:14px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto;">
-    <h2 style="margin-top:0;">📋 Control de Preparación</h2>
-    <p style="font-size:14px;color:#555;">Marque los productos a medida que los separa:</p>
+    <h2 style="margin-top:0;" id="tituloControlPedido">📋 Control de Preparación</h2>
+    <p style="font-size:14px;color:#555;">Marque los productos a medida que los separa. Si el cliente pide cambiar algo, use "Editar pedido" y después vuelva a este control.</p>
     <hr>
     <div id="listaControlCheck" style="text-align:left;margin:20px 0;"></div>
     <hr>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <button id="btnFinalizarControl" disabled onclick="descargarPDFDesdeControl()" style="background:#ccc;color:white;padding:15px;border-radius:10px;border:none;font-weight:bold;cursor:not-allowed;font-size:15px;">
+      <button id="btnFinalizarControl" disabled onclick="finalizarDesdeControl()" style="background:#ccc;color:white;padding:15px;border-radius:10px;border:none;font-weight:bold;cursor:not-allowed;font-size:15px;">
         FINALIZAR Y DESCARGAR PDF
       </button>
-      <button onclick="cerrarControlPedido()" style="background:none;border:none;color:#e74c3c;cursor:pointer;text-decoration:underline;">Cancelar</button>
+      <button id="btnEditarDesdeControl" onclick="editarDesdeControl()" style="background:#f39c12;color:white;padding:12px;border-radius:10px;border:none;font-weight:bold;cursor:pointer;font-size:14px;">
+        ✏️ Editar pedido (agregar/quitar/cambiar cantidad)
+      </button>
+      <button onclick="cerrarControlPedido()" style="background:none;border:none;color:#e74c3c;cursor:pointer;text-decoration:underline;">Cerrar</button>
     </div>
   </div>
 </div>
@@ -815,6 +825,8 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let todasLasPromos = [];
 let pedidoTemp = [];
 let pedidoExistenteId = null;
+// Progreso del checklist de preparación: { [productoId]: { checked, cantidad } }
+let checklistPreparacion = {};
 
 // --- DIAGNÓSTICO: si algo revienta en silencio (típico en el celular),
 // esto lo muestra en pantalla en vez de dejar la app "trabada" sin aviso.
@@ -838,7 +850,8 @@ function guardarEstadoLocal() {
       clienteLocalidad: document.getElementById("clienteLocalidad").value,
       pedidoExistenteId: pedidoExistenteId,
       totalFinal: ctEl ? ctEl.value : null,
-      descuento: document.getElementById("inputDescuento")?.value || "0"
+      descuento: document.getElementById("inputDescuento")?.value || "0",
+      checklistPreparacion: checklistPreparacion
     };
     localStorage.setItem("pedido_respaldo", JSON.stringify(estado));
   } catch (e) {
@@ -857,6 +870,7 @@ function guardarEstadoLocal() {
       // Recuperar productos
       pedidoTemp = datos.pedidoTemp || [];
       pedidoExistenteId = datos.pedidoExistenteId || null;
+      checklistPreparacion = datos.checklistPreparacion || {};
       
       // Recuperar textos
       if(datos.clienteNombre) document.getElementById("clienteNombre").value = datos.clienteNombre;
@@ -1536,6 +1550,7 @@ async function consultarPedidosCliente() {
 
         pedidoTemp = [];
         pedidoExistenteId = p.id;
+        checklistPreparacion = {}; // evita arrastrar marcas de control de OTRO pedido
         
         if (Array.isArray(p.productos)) {
           p.productos.forEach(prod => {
@@ -1614,70 +1629,36 @@ async function confirmarPedido() {
         ultima_compra: fechaISO 
     }, { onConflict: 'dni' });
 
-    const datosPedido = {
-      cliente: nombreCliente,
-      dni: dni,
-      localidad_id: parseInt(localidadId),
-      total: totalCalculado,
-      productos: pedidoTemp,
-      archivado: false,
-      estado: "pendiente",
-      created_at: fechaISO
-    };
+    // 3. STOCK + PEDIDO en una sola llamada atómica.
+    // procesar_stock_pedido ahora también crea/actualiza la fila de 'pedidos'
+    // (productos, total, saldo_pendiente) dentro de la misma transacción SQL,
+    // para que nunca quede el stock ajustado sin que el pedido se haya
+    // guardado (o viceversa) si algo falla a mitad de camino.
+    const { data: idResultante, error: errRpc } = await sb.rpc('procesar_stock_pedido', {
+      p_pedido_id: pedidoExistenteId,       // null si es un pedido nuevo
+      p_productos_nuevos: pedidoTemp,
+      p_es_edicion: !!pedidoExistenteId,
+      p_cliente: nombreCliente,
+      p_dni: dni,
+      p_localidad_id: parseInt(localidadId),
+      p_total: totalCalculado
+    });
+    if (errRpc) throw errRpc;
 
-    if (pedidoExistenteId) {
-      // --- ESCENARIO: EDICIÓN ---
-      // Revertir stock viejo y aplicar nuevo vía RPC
-      await sb.rpc('procesar_stock_pedido', {
-        p_pedido_id: pedidoExistenteId,
-        p_productos_nuevos: pedidoTemp,
-        p_es_edicion: true
-      });
-
-      // Recalculamos saldo_pendiente en base al total nuevo y los pagos que ya tenía
-      // el pedido, para que no quede desactualizado si el total cambió al editar.
-      const { data: pedidoPrevio, error: errPrevio } = await sb
-        .from("pedidos")
-        .select("pagos")
-        .eq("id", pedidoExistenteId)
-        .single();
-      if (errPrevio) throw errPrevio;
-
-      const pagosPrevios = Array.isArray(pedidoPrevio?.pagos) ? pedidoPrevio.pagos : [];
-      const totalPagadoPrevio = pagosPrevios.reduce((s, p) => s + (parseFloat(p.monto) || 0), 0);
-      const saldoRecalculado = Math.max(0, totalCalculado - totalPagadoPrevio);
-
-      const { error } = await sb.from("pedidos")
-        .update({ ...datosPedido, saldo_pendiente: saldoRecalculado })
-        .eq("id", pedidoExistenteId);
-      if (error) throw error;
-      console.log("Pedido editado y stock sincronizado.");
-    } else {
-      // --- ESCENARIO: NUEVO ---
-      const { data, error } = await sb.from("pedidos")
-        .insert([{ ...datosPedido, pagos: [], saldo_pendiente: totalCalculado }])
-        .select('id');
-      if (error) throw error;
-      
-      const nuevoId = data[0].id;
-      pedidoExistenteId = nuevoId; 
-
-      await sb.rpc('procesar_stock_pedido', {
-        p_pedido_id: nuevoId,
-        p_productos_nuevos: pedidoTemp,
-        p_es_edicion: false
-      });
-      console.log("Nuevo pedido creado y stock descontado.");
+    if (!pedidoExistenteId) {
+      pedidoExistenteId = idResultante;
     }
 
-    // 3. FINALIZACIÓN
+    console.log("Pedido guardado y stock sincronizado.");
+
+    // 4. FINALIZACIÓN
     document.getElementById("modalPDF").style.display = "flex";
 
   } catch (err) {
     console.error("Error crítico en confirmarPedido:", err);
     alert("❌ Error: " + (err.message || "No se pudo procesar el pedido"));
   } finally {
-    // 4. Liberamos el bloqueo siempre, incluso si hubo error
+    // 5. Liberamos el bloqueo siempre, incluso si hubo error
     isProcessingOrder = false;
     // document.getElementById("btnConfirmar").innerText = "Confirmar Pedido";
   }
@@ -1716,6 +1697,7 @@ function reiniciarPedido() {
     // 2. Resetear variables de lógica
     pedidoTemp = [];
     pedidoExistenteId = null; // <--- CRÍTICO: Esto evita que el nuevo pedido pise al anterior
+    checklistPreparacion = {};
     pagosTemporales = [];
     pagosPreviosBD = [];
 
@@ -1965,49 +1947,91 @@ async function procesarRegistroPagoMulti() {
 
 
 // Función para abrir el modal de checklist
-function abrirControlPedido() {
+// ==========================================
+// CONTROL DE PREPARACIÓN (checklist)
+// ==========================================
+// checklistPreparacion guarda, por id de producto, si ya se separó y con
+// qué cantidad se marcó. Si la cantidad de ese producto cambia después
+// (porque el cliente pidió más/menos), se muestra como no marcado de nuevo,
+// para no dar por controlada una cantidad que ya no es la actual.
+// (declarada arriba, junto al resto de las variables globales del pedido)
+
+function abrirControlPedido(modoPostGuardado = false) {
+  if (pedidoTemp.length === 0) {
+    alert("🛒 El carrito está vacío, no hay nada que controlar.");
+    return;
+  }
+
   document.getElementById("modalPDF").style.display = "none";
   const modalControl = document.getElementById("modalControlPedido");
   const contenedor = document.getElementById("listaControlCheck");
-  
-  contenedor.innerHTML = ""; // Limpiar contenido previo
+  modalControl.dataset.modoPostGuardado = modoPostGuardado ? "1" : "0";
 
-  pedidoTemp.forEach((prod, index) => {
+  // Limpiamos del checklist cualquier producto que ya no esté en el carrito
+  // (por ejemplo, si se quitó durante una edición)
+  Object.keys(checklistPreparacion).forEach(id => {
+    if (!pedidoTemp.some(p => String(p.id) === String(id))) {
+      delete checklistPreparacion[id];
+    }
+  });
+
+  document.getElementById("tituloControlPedido").textContent = pedidoExistenteId
+    ? `📋 Control de Preparación — Pedido #${pedidoExistenteId}`
+    : "📋 Control de Preparación — Pedido nuevo";
+
+  contenedor.innerHTML = "";
+  pedidoTemp.forEach((prod) => {
+    const registro = checklistPreparacion[prod.id];
+    // Solo lo consideramos "marcado" si sigue siendo la misma cantidad
+    // que cuando se marcó; si cambió, hay que volver a controlarlo.
+    const marcado = !!(registro && registro.checked && registro.cantidad === prod.cantidad);
+    const cantidadCambio = !!(registro && registro.cantidad !== prod.cantidad);
+
     const div = document.createElement("div");
-    div.className = "item-control";
+    div.className = "item-control" + (marcado ? " checked" : "");
     div.innerHTML = `
-      <input type="checkbox" id="check-${index}" class="check-preparacion" onchange="validarChecklist()">
-      <label for="check-${index}">
+      <input type="checkbox" id="check-${prod.id}" class="check-preparacion" data-id="${prod.id}"
+        ${marcado ? "checked" : ""} onchange="toggleCheckPreparacion('${prod.id}', this.checked)">
+      <label for="check-${prod.id}">
         <strong>${prod.cantidad}x</strong> ${prod.nombre}
+        ${cantidadCambio ? '<br><span style="color:#e67e22;font-size:12px;">⚠️ la cantidad cambió, volvé a controlar</span>' : ""}
       </label>
     `;
     contenedor.appendChild(div);
   });
 
+  const btnEditar = document.getElementById("btnEditarDesdeControl");
+  if (btnEditar) btnEditar.style.display = modoPostGuardado ? "none" : "block";
+
   modalControl.style.display = "flex";
-  validarChecklist(); // Inicializar estado del botón
+  validarChecklist();
+}
+
+function toggleCheckPreparacion(id, checked) {
+  const prod = pedidoTemp.find(p => String(p.id) === String(id));
+  checklistPreparacion[id] = { checked: checked, cantidad: prod ? prod.cantidad : null };
+  guardarEstadoLocal(); // guarda también el progreso del checklist
+  validarChecklist();
 }
 
 // Función para validar si todos los productos están marcados
 function validarChecklist() {
   const checkboxes = document.querySelectorAll(".check-preparacion");
   const btnFinalizar = document.getElementById("btnFinalizarControl");
+  const modalControl = document.getElementById("modalControlPedido");
+  const modoPostGuardado = modalControl.dataset.modoPostGuardado === "1";
   const todosMarcados = Array.from(checkboxes).every(cb => cb.checked);
 
-  // Aplicar estilo visual a las filas marcadas
   checkboxes.forEach(cb => {
-    if (cb.checked) {
-      cb.parentElement.classList.add("checked");
-    } else {
-      cb.parentElement.classList.remove("checked");
-    }
+    const fila = cb.closest(".item-control");
+    if (fila) fila.classList.toggle("checked", cb.checked);
   });
 
   if (todosMarcados && checkboxes.length > 0) {
     btnFinalizar.disabled = false;
     btnFinalizar.style.background = "#27ae60";
     btnFinalizar.style.cursor = "pointer";
-    btnFinalizar.textContent = "✅ TODO LISTO - DESCARGAR PDF";
+    btnFinalizar.textContent = modoPostGuardado ? "✅ LISTO - DESCARGAR PDF" : "✅ TODO LISTO - GUARDAR PEDIDO";
   } else {
     btnFinalizar.disabled = true;
     btnFinalizar.style.background = "#ccc";
@@ -2016,24 +2040,57 @@ function validarChecklist() {
   }
 }
 
-function cerrarControlPedido() {
+// Cierra el checklist para volver a editar el carrito (agregar/quitar/cambiar
+// cantidades). No resetea nada: el carrito y el progreso marcado hasta ahora
+// quedan guardados, y al reabrir el control se reconcilian automáticamente
+// contra el carrito actual.
+function editarDesdeControl() {
   document.getElementById("modalControlPedido").style.display = "none";
-  reiniciarPedido(); // Opcional: si quieres limpiar todo al cancelar
+  scrollAlCarrito();
 }
 
-async function descargarPDFDesdeControl() {
-    // 1. Asegurar guardado
-    await confirmarPedido(); 
-    
-    // 2. Descargar
-    descargarPDF(); 
-    
-    // 3. Cerrar este modal y el anterior
-    document.getElementById("modalControlPedido").style.display = "none";
-    document.getElementById("modalPDF").style.display = "none";
-    
-    // 4. Reset total
+function cerrarControlPedido() {
+  const modalControl = document.getElementById("modalControlPedido");
+  const modoPostGuardado = modalControl.dataset.modoPostGuardado === "1";
+  modalControl.style.display = "none";
+
+  if (modoPostGuardado) {
+    // Llegamos acá desde "Ver y controlar pedido" después de que el pedido
+    // ya se había guardado (stock ya descontado): cerrar significa que
+    // terminamos con este cliente.
     reiniciarPedido();
+  }
+  // Si el pedido todavía NO se guardó, no tocamos nada: dejamos el carrito
+  // y el progreso del checklist tal cual para que lo retomen cuando quieran.
+}
+
+// Se ejecuta al tocar "FINALIZAR" con todo marcado. Si el pedido todavía no
+// se había guardado, es acá donde recién se guarda de verdad y se descuenta
+// el stock (vía confirmarPedido -> procesar_stock_pedido). Si ya se había
+// guardado antes (modo post-guardado), no lo vuelve a guardar: solo descarga.
+async function finalizarDesdeControl() {
+  const modalControl = document.getElementById("modalControlPedido");
+  const modoPostGuardado = modalControl.dataset.modoPostGuardado === "1";
+
+  try {
+    if (!modoPostGuardado) {
+      await confirmarPedido(); // acá se guarda el pedido y se descuenta el stock
+      if (!pedidoExistenteId) return; // confirmarPedido falló (validación, error), no seguimos
+    }
+
+    modalControl.style.display = "none";
+
+    // El checklist ya cumplió su función para este pedido
+    checklistPreparacion = {};
+    guardarEstadoLocal();
+
+    // Mostramos las opciones finales: registrar pago o descargar PDF
+    document.getElementById("modalPDF").style.display = "flex";
+
+  } catch (err) {
+    console.error("Error al finalizar desde el control:", err);
+    // confirmarPedido ya muestra su propio alert con el detalle del error
+  }
 }
 
   
