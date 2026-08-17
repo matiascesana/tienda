@@ -568,9 +568,19 @@
       Distribuidora Allana
       <small>Tienda de Promociones</small>
     </div>
+    <button type="button" id="btnDictadoVoz" onclick="toggleDictadoVoz()" title="Dictar productos por voz"
+      style="width:34px;height:34px;min-width:34px;border-radius:50%;border:none;background:rgba(255,255,255,0.18);color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">
+      🎤
+    </button>
   </div>
   <button id="headerCarritoBadge" onclick="scrollAlCarrito()">🛒 <span id="headerCarritoCount">0</span> — <span id="headerCarritoTotal">$0</span></button>
 </header>
+
+<div id="panelDictadoVoz" style="display:none;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:8px 16px;">
+  <p id="estadoDictadoVoz" style="margin:0 0 4px;font-size:13px;font-weight:600;color:#2c3e50;">🎤 Escuchando...</p>
+  <p style="margin:0 0 6px;font-size:11px;color:#94a3b8;">Decí, por ejemplo: "dos coca cola" o "agregar 3 fideos matarazzo".</p>
+  <div id="logDictadoVoz" style="max-height:130px;overflow-y:auto;"></div>
+</div>
 
 <main>
 
@@ -1248,6 +1258,220 @@ function modificarCantidad(id, cambio) {
   if (producto.cantidad <= 0) pedidoTemp = pedidoTemp.filter(p => String(p.id) !== String(id));
   renderCarritoCliente();
 }
+
+// ==========================================
+// DICTADO POR VOZ (Web Speech API)
+// ==========================================
+// IMPORTANTE: esto es dictado común (habla -> texto), NO reconocimiento de
+// "quién" habla. El "Voice Match" del celular es una función del sistema
+// operativo (Asistente/Siri) que no está disponible para páginas web por
+// privacidad. Por eso el micrófono se prende y apaga a mano con el botón,
+// en vez de quedar escuchando solo en segundo plano.
+//
+// Soporte: funciona en Chrome/Android. En iPhone (Safari) no hay soporte
+// de reconocimiento de voz continuo del lado del navegador.
+
+let reconocimientoVoz = null;
+let dictadoActivo = false;
+
+function soportaDictadoVoz() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+function toggleDictadoVoz() {
+  if (dictadoActivo) detenerDictadoVoz();
+  else iniciarDictadoVoz();
+}
+
+function iniciarDictadoVoz() {
+  if (!soportaDictadoVoz()) {
+    alert("Este navegador no admite dictado por voz. Probá con Chrome en Android; en iPhone no está disponible.");
+    return;
+  }
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  reconocimientoVoz = new SR();
+  reconocimientoVoz.lang = "es-AR";
+  reconocimientoVoz.continuous = true;
+  reconocimientoVoz.interimResults = true;
+
+  reconocimientoVoz.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const texto = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        procesarComandoVoz(texto);
+      } else {
+        interim = texto;
+      }
+    }
+    if (interim) actualizarEstadoDictado(`👂 "${interim}"`);
+  };
+
+  reconocimientoVoz.onerror = (event) => {
+    console.error("Error de dictado por voz:", event.error);
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      alert("No se pudo acceder al micrófono. Revisá los permisos del navegador para este sitio.");
+      detenerDictadoVoz();
+    }
+    // Otros errores (no-speech, network) se ignoran: onend se encarga de reintentar.
+  };
+
+  reconocimientoVoz.onend = () => {
+    // En mobile, el reconocimiento se corta solo tras un rato de silencio.
+    // Si el usuario no lo apagó explícitamente, lo reiniciamos.
+    if (dictadoActivo) {
+      try { reconocimientoVoz.start(); } catch (e) { /* ya estaba iniciado, ignorar */ }
+    }
+  };
+
+  dictadoActivo = true;
+  try {
+    reconocimientoVoz.start();
+  } catch (e) {
+    console.error("No se pudo iniciar el dictado:", e);
+    dictadoActivo = false;
+    return;
+  }
+
+  document.getElementById("btnDictadoVoz").textContent = "🔴";
+  document.getElementById("btnDictadoVoz").title = "Detener dictado por voz";
+  document.getElementById("btnDictadoVoz").style.background = "var(--c-danger)";
+  document.getElementById("panelDictadoVoz").style.display = "block";
+  actualizarEstadoDictado("🎤 Escuchando...");
+}
+
+function detenerDictadoVoz() {
+  dictadoActivo = false;
+  if (reconocimientoVoz) {
+    try { reconocimientoVoz.stop(); } catch (e) { /* ya estaba detenido, ignorar */ }
+  }
+  document.getElementById("btnDictadoVoz").textContent = "🎤";
+  document.getElementById("btnDictadoVoz").title = "Dictar productos por voz";
+  document.getElementById("btnDictadoVoz").style.background = "rgba(255,255,255,0.18)";
+  actualizarEstadoDictado("Dictado detenido.");
+}
+
+function actualizarEstadoDictado(texto) {
+  const el = document.getElementById("estadoDictadoVoz");
+  if (el) el.textContent = texto;
+}
+
+function registrarLogDictado(linea) {
+  const log = document.getElementById("logDictadoVoz");
+  if (!log) return;
+  const item = document.createElement("div");
+  item.style = "padding:5px 0;border-bottom:1px solid #e2e8f0;font-size:13px;color:#334155;";
+  item.textContent = linea;
+  log.insertBefore(item, log.firstChild);
+  while (log.children.length > 8) log.removeChild(log.lastChild); // solo las últimas 8
+}
+
+// Números dictados en palabras -> valor. Cubre los casos más comunes al
+// pedir cantidades de productos de almacén/kiosco.
+const PALABRAS_CANTIDAD_VOZ = {
+  "un": 1, "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5,
+  "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10, "once": 11,
+  "doce": 12, "trece": 13, "catorce": 14, "quince": 15, "veinte": 20,
+  "treinta": 30, "docena": 12
+};
+
+function extraerCantidadYNombre(textoOriginal) {
+  let t = textoOriginal.toLowerCase().trim();
+  // Sacamos muletillas típicas: "agregar", "sumar", "cargar", "añadir"
+  t = t.replace(/^(agreg(a|ar|á)|sum(a|ar)|carg(a|ar)|añad(e|ir))\s+/i, "");
+
+  // "3 coca cola" (número en dígitos al principio)
+  const matchDigitos = t.match(/^(\d+)\s+(.+)$/);
+  if (matchDigitos) {
+    return { cantidad: parseInt(matchDigitos[1], 10), nombre: matchDigitos[2].trim() };
+  }
+
+  // "dos coca cola" (número en palabras al principio)
+  const primerToken = t.split(" ")[0];
+  if (PALABRAS_CANTIDAD_VOZ[primerToken] !== undefined) {
+    return { cantidad: PALABRAS_CANTIDAD_VOZ[primerToken], nombre: t.slice(primerToken.length).trim() };
+  }
+
+  // Sin cantidad dicha explícitamente: asumimos 1 unidad
+  return { cantidad: 1, nombre: t };
+}
+
+// Puntaje simple de similitud por palabras en común (sin tildes), para
+// elegir el producto del catálogo que mejor coincide con lo dictado.
+function puntajeSimilitudTexto(dictado, nombreCatalogo) {
+  const normalizar = s => s.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim();
+  const palabrasDictado = normalizar(dictado).split(/\s+/).filter(Boolean);
+  const palabrasCatalogo = new Set(normalizar(nombreCatalogo).split(/\s+/).filter(Boolean));
+  if (palabrasDictado.length === 0) return 0;
+  let coincidencias = 0;
+  palabrasDictado.forEach(p => { if (palabrasCatalogo.has(p)) coincidencias++; });
+  return coincidencias / palabrasDictado.length;
+}
+
+async function procesarComandoVoz(textoOriginal) {
+  const { cantidad, nombre } = extraerCantidadYNombre(textoOriginal);
+  if (!nombre) return;
+
+  const cantidadFinal = (isNaN(cantidad) || cantidad <= 0) ? 1 : cantidad;
+  actualizarEstadoDictado(`🔎 Buscando "${nombre}"...`);
+
+  try {
+    // Buscamos por la primera palabra (suele ser la marca o el tipo de
+    // producto) para acotar, y después afinamos localmente por similitud
+    // usando el resto de lo dictado.
+    const primeraPalabra = nombre.split(" ")[0];
+    const { data, error } = await sb
+      .from("promociones")
+      .select("id, nombre, precio, precio_anterior, stock")
+      .ilike("nombre", `%${primeraPalabra}%`)
+      .limit(25);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      actualizarEstadoDictado(`❌ No encontré "${nombre}".`);
+      registrarLogDictado(`❌ "${textoOriginal}" — sin coincidencias en el catálogo`);
+      return;
+    }
+
+    let mejor = null, mejorPuntaje = 0;
+    data.forEach(p => {
+      const puntaje = puntajeSimilitudTexto(nombre, p.nombre);
+      if (puntaje > mejorPuntaje) { mejorPuntaje = puntaje; mejor = p; }
+    });
+
+    if (!mejor || mejorPuntaje === 0) {
+      actualizarEstadoDictado(`❌ No encontré "${nombre}".`);
+      registrarLogDictado(`❌ "${textoOriginal}" — sin coincidencias en el catálogo`);
+      return;
+    }
+
+    if ((mejor.stock ?? 0) <= 0) {
+      actualizarEstadoDictado(`⚠️ "${mejor.nombre}" está sin stock.`);
+      registrarLogDictado(`⚠️ "${textoOriginal}" → ${mejor.nombre} SIN STOCK, no se agregó`);
+      return;
+    }
+
+    carritoLista(mejor.id, mejor.nombre, Number(mejor.precio) || 0, mejor.precio_anterior, cantidadFinal);
+    actualizarEstadoDictado(`✅ Agregado: ${cantidadFinal}x ${mejor.nombre}`);
+    registrarLogDictado(`✅ "${textoOriginal}" → ${cantidadFinal}x ${mejor.nombre}`);
+
+  } catch (e) {
+    console.error("Error procesando comando de voz:", e);
+    actualizarEstadoDictado("⚠️ Error buscando el producto.");
+    registrarLogDictado(`⚠️ "${textoOriginal}" — error al buscar`);
+  }
+}
+
+// Si el vendedor cierra/recarga la pestaña con el dictado activo, no
+// queremos que el micrófono quede pedido de fondo.
+window.addEventListener("beforeunload", () => {
+  if (dictadoActivo) detenerDictadoVoz();
+});
 
 // ── Búsqueda de productos en línea (para la fila de agregar) ──
 let buscarLineaTimer;
