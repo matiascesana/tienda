@@ -1173,7 +1173,7 @@ function renderPromos(promos) {
         ? `https://rgbjinmllhhymczumwhs.supabase.co/storage/v1/object/public/promo_images/${p.imagen}`
         : "https://via.placeholder.com/200x140?text=Sin+Imagen";
 
-      const nombreEscapado = p.nombre.replace(/'/g, "\\'");
+      const nombreEscapado = p.nombre.replace(/'/g, "\\'").replace(/"/g, "&quot;");
       const stock = p.stock || 0;
       let stockColor = stock < 5 ? (stock === 0 ? '#e74c3c' : '#f39c12') : '#27ae60';
       let stockText = stock === 0 ? '¡AGOTADO!' : `Stock: ${stock}`;
@@ -1492,7 +1492,7 @@ async function buscarProductoEnLinea(texto) {
       const stock = p.stock ?? 0;
       const stockColor = stock === 0 ? '#e74c3c' : (stock < 5 ? '#f39c12' : '#27ae60');
       return `
-      <div onclick="seleccionarSugerencia(${p.id}, '${p.nombre.replace(/'/g,"\'")}', ${p.precio})"
+      <div onclick="seleccionarSugerencia(${p.id}, '${p.nombre.replace(/'/g,"\\'").replace(/"/g,"&quot;")}', ${p.precio})"
         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:14px;display:flex;justify-content:space-between;align-items:center;"
         onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
         <span>${p.nombre} <span style="color:${stockColor};font-weight:600;">(${stock})</span></span>
