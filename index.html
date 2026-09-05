@@ -128,6 +128,22 @@
     margin: 0 0 12px;
   }
 
+  /* Fila con los dos filtros (categoría y tipo) uno al lado del otro,
+     debajo del texto escrito, sin superponerse entre sí. */
+  .fila-filtros-catalogo {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .fila-filtros-catalogo select {
+    flex: 1 1 160px;
+    min-width: 140px;
+    width: auto;
+    margin-top: 0;
+  }
+
   /* ── Sección datos cliente ── */
   .seccion-cliente {
     border: 1px solid var(--c-border);
@@ -587,10 +603,15 @@
   <!-- ① CATÁLOGO (primero para el flujo del vendedor) -->
   <div class="seccion-catalogo">
     <h2>🏷️ Seleccionar productos</h2>
-    <select id="categoriaSelect" onchange="cargarPromosPorCategoria()">
-      <option value="">Seleccionar categoría...</option>
-    </select>
     <input id="busquedaPromo" type="text" placeholder="Buscar producto por nombre...">
+    <div class="fila-filtros-catalogo">
+      <select id="categoriaSelect" onchange="filtrarProductos()">
+        <option value="">Seleccionar categoría...</option>
+      </select>
+      <select id="tipoSelect" onchange="filtrarProductos()">
+        <option value="">Seleccionar tipo...</option>
+      </select>
+    </div>
     <div id="productosContainer" class="productos-container"></div>
   </div>
 
@@ -984,6 +1005,29 @@ async function cargarCategorias() {
   });
 }
 
+// ================== CARGA TIPOS (desde la tabla tipos_producto) ==================
+async function cargarTipos() {
+  const { data, error } = await sb
+    .from("tipos_producto")
+    .select("*")
+    .order("nombre", { ascending: true });
+
+  if (error) {
+    console.error("Error al cargar tipos:", error);
+    return;
+  }
+
+  const select = document.getElementById("tipoSelect");
+  select.innerHTML = '<option value="">Seleccionar tipo...</option>';
+
+  (data || []).forEach(tipo => {
+    const opt = document.createElement("option");
+    opt.value = tipo.id;
+    opt.textContent = tipo.nombre;
+    select.appendChild(opt);
+  });
+}
+
 // ================== BUSCAR CLIENTE POR NOMBRE ==================
 async function buscarClientePorNombre() {
   const nombreBusqueda = document.getElementById("clienteNombre").value.trim();
@@ -1100,23 +1144,28 @@ document.getElementById("busquedaPromo").addEventListener("input", () => {
 
 async function filtrarProductos() {
   const catId = document.getElementById("categoriaSelect").value;
+  const tipo = document.getElementById("tipoSelect").value;
   const texto = document.getElementById("busquedaPromo").value.trim();
   const cont = document.getElementById("productosContainer");
 
   // Limpieza: si no hay filtros, no traemos nada
-  if (!catId && !texto) {
+  if (!catId && !tipo && !texto) {
     cont.innerHTML = "";
     promosCache = [];
     return;
   }
 
   // Consulta dinámica a Supabase
-  let query = sb.from("promociones").select("id, nombre, precio, precio_anterior, stock, categoria_id, imagen");
+  let query = sb.from("promociones").select("id, nombre, precio, precio_anterior, stock, categoria_id, tipo_id, imagen");
 
   if (catId) {
     query = query.eq("categoria_id", catId);
   }
-  
+
+  if (tipo) {
+    query = query.eq("tipo_id", tipo);
+  }
+
   if (texto) {
     query = query.ilike("nombre", `%${texto}%`);
   }
@@ -1605,6 +1654,20 @@ function renderCarritoCliente() {
       document.getElementById("carritoCount").textContent = "0";
       const ct = document.getElementById("carritoTotal");
       if (ct) ct.value = "0.00";
+
+      // Ocultar también la barra verde flotante (sticky) y el badge del
+      // header: antes se quedaban mostrando el último total porque acá
+      // se cortaba el flujo antes de llegar a recalcularTotales(), que
+      // es la única función que los actualiza/oculta.
+      const badge = document.getElementById("headerCarritoBadge");
+      if (badge) badge.style.display = "none";
+      const sticky = document.getElementById("carritoSticky");
+      if (sticky) sticky.style.display = "none";
+      const stickyCountEl = document.getElementById("stickyCount");
+      if (stickyCountEl) stickyCountEl.textContent = "0";
+      const stickyTotalEl = document.getElementById("stickyTotal");
+      if (stickyTotalEl) stickyTotalEl.textContent = "$0.00";
+
       guardarEstadoLocal();
       return;
     }
@@ -1931,6 +1994,7 @@ function reiniciarPedido() {
     document.getElementById("clienteLocalidad").value = "";
     document.getElementById("busquedaPromo").value = "";
     document.getElementById("categoriaSelect").value = "";
+    document.getElementById("tipoSelect").value = "";
     
     // 4. Limpiar contenedores
     document.getElementById("productosContainer").innerHTML = "";
@@ -2452,6 +2516,7 @@ function cerrarModalPago() {
 // ================== INICIALIZACIÓN ==================
 window.addEventListener("DOMContentLoaded", async () => {
   await cargarCategorias();
+  await cargarTipos();
   await cargarLocalidades();
   // Se eliminó cualquier llamada a cargar productos aquí
   cargarEstadoLocal(); 
