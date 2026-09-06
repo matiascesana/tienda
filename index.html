@@ -589,7 +589,11 @@
       🎤
     </button>
   </div>
-  <button id="headerCarritoBadge" onclick="scrollAlCarrito()">🛒 <span id="headerCarritoCount">0</span> — <span id="headerCarritoTotal">$0</span></button>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <button id="btnResumenCategorias" onclick="abrirResumenCategorias()" title="Ver cuántos productos van por categoría"
+      style="display:none;background:rgba(255,255,255,0.25);color:white;border:none;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">📊 Categorías</button>
+    <button id="headerCarritoBadge" onclick="scrollAlCarrito()">🛒 <span id="headerCarritoCount">0</span> — <span id="headerCarritoTotal">$0</span></button>
+  </div>
 </header>
 
 <div id="panelDictadoVoz" style="display:none;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:8px 16px;">
@@ -639,29 +643,36 @@
             </td>
           </tr>
         </tbody>
-        <tfoot>
-          <tr style="background:#f8fafc;border-top:2px dashed #cbd5e1;">
-            <td style="padding:8px;" colspan="5">
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <div style="position:relative;flex:2;min-width:180px;">
-                  <input id="inputNuevoProducto" type="text"
-                    placeholder="Escribir o buscar producto..."
-                    style="width:100%;padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;margin:0;"
-                    oninput="buscarProductoEnLinea(this.value)"
-                    onkeydown="if(event.key==='Escape') cerrarSugerencias()">
-                  <div id="sugerenciasProducto" style="display:none;position:fixed;background:white;border:1.5px solid #2980b9;border-radius:8px;z-index:99999;max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.25);"></div>
-                </div>
-                <input id="inputNuevaCantidad" type="number" value="1" min="1"
-                  style="width:70px;padding:9px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;text-align:center;margin:0;">
-                <input id="inputNuevoPrecio" type="number" step="0.01" placeholder="Precio"
-                  style="width:90px;padding:9px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;text-align:right;margin:0;">
-                <button onclick="agregarLineaManual()"
-                  style="padding:9px 16px;background:#2980b9;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">+ Agregar</button>
-              </div>
-            </td>
-          </tr>
-        </tfoot>
       </table>
+    </div>
+
+    <!-- Agregar producto manual: fuera de la tabla (que tiene scroll horizontal)
+         para que en el celular, con zoom, nunca haga falta desplazarse hacia
+         los costados para llegar al botón. Cantidad y "Agregar" quedan
+         primero (a la izquierda / arriba), el precio al final porque se
+         autocompleta solo y se toca con menos frecuencia. -->
+    <div class="agregar-manual-box" style="background:#f8fafc;border-top:2px dashed #cbd5e1;margin-top:14px;padding:12px 8px 4px;">
+      <div style="position:relative;margin-bottom:10px;">
+        <input id="inputNuevoProducto" type="text"
+          placeholder="Escribir o buscar producto..."
+          style="width:100%;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;margin:0;"
+          oninput="buscarProductoEnLinea(this.value)"
+          onkeydown="if(event.key==='Escape') cerrarSugerencias(); if(event.key==='Enter') agregarLineaManual();">
+        <div id="sugerenciasProducto" style="display:none;position:fixed;background:white;border:1.5px solid #2980b9;border-radius:8px;z-index:99999;max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.25);"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button type="button" onclick="agregarLineaManual()"
+          style="order:1;padding:10px 18px;background:#27ae60;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">➕ Agregar</button>
+        <div class="quantity-controls-card" style="order:2;margin:0;">
+          <button type="button" class="btn-cantidad-menos" onclick="cambiarCantidadManual(-1)">−</button>
+          <span id="displayCantidadManual" class="cantidad-display-card">1</span>
+          <button type="button" class="btn-cantidad-mas" onclick="cambiarCantidadManual(1)">+</button>
+        </div>
+        <input id="inputNuevaCantidad" type="hidden" value="1">
+        <input id="inputNuevoPrecio" type="number" step="0.01" placeholder="Precio"
+          onkeydown="if(event.key==='Enter') agregarLineaManual();"
+          style="order:3;flex:1;min-width:90px;padding:10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;text-align:right;margin:0;">
+      </div>
     </div>
 
     <div id="panelTotales" style="display:none;margin-top:16px;border-top:2px solid #e2e8f0;padding-top:14px;">
@@ -740,7 +751,10 @@
 <div id="carritoSticky" onclick="scrollAlCarrito()">
   <div class="sticky-info">🛒 <span id="stickyCount">0</span> producto(s)</div>
   <div class="sticky-total" id="stickyTotal">$0.00</div>
-  <button class="sticky-btn" onclick="event.stopPropagation();scrollAlCarrito()">Ver carrito ↑</button>
+  <div style="display:flex;gap:6px;">
+    <button class="sticky-btn" onclick="event.stopPropagation();abrirResumenCategorias()" style="background:#fef9c3;color:#92400e;">📊</button>
+    <button class="sticky-btn" onclick="event.stopPropagation();scrollAlCarrito()">Ver carrito ↑</button>
+  </div>
 </div>
 
 <!-- WhatsApp -->
@@ -789,6 +803,25 @@
   <div class="modal-content-img">
     <button class="close-button" onclick="cerrarModalImagen()">Cerrar</button>
     <img id="imagenModalAmpliada" src="" alt="Imagen Ampliada">
+  </div>
+</div>
+
+<!-- Modal resumen por categoría: para controlar rápido cuántas unidades
+     van cargadas de cada categoría (ej. "Tinturas Primont") sin tener
+     que contarlas de a una en el carrito. -->
+<div id="modalResumenCategorias" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);justify-content:center;align-items:center;z-index:3500;padding:15px;">
+  <div style="background:white;padding:22px;border-radius:14px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h2 style="margin:0;font-size:18px;color:#2c3e50;">📊 Productos por categoría</h2>
+      <button onclick="cerrarResumenCategorias()" style="background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:#94a3b8;padding:0 4px;">×</button>
+    </div>
+    <p style="font-size:12px;color:#94a3b8;margin:0 0 14px;">Controlá rápido cuántas unidades van de cada categoría, sin contarlas una por una.</p>
+    <div id="listaResumenCategorias"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:2px solid #e2e8f0;font-weight:800;color:#166534;font-size:15px;">
+      <span id="resumenCategoriasTotalItems">0 productos</span>
+      <span id="resumenCategoriasTotalMonto">$0.00</span>
+    </div>
+    <button onclick="cerrarResumenCategorias()" style="width:100%;margin-top:14px;padding:12px;background:#2980b9;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;">Cerrar</button>
   </div>
 </div>
 
@@ -1003,6 +1036,17 @@ async function cargarCategorias() {
     opt.textContent = cat.nombre;
     select.appendChild(opt);
   });
+}
+
+// Devuelve el nombre de una categoría a partir de su id, usando las
+// opciones ya cargadas en el select de categorías. Se usa para poder
+// guardar el nombre de categoría de cada producto agregado al carrito
+// (por voz o por el buscador manual), y así armar el resumen "por
+// categoría" sin depender de que el catálogo esté filtrado en pantalla.
+function nombreCategoriaPorId(catId) {
+  if (!catId) return null;
+  const opt = document.querySelector(`#categoriaSelect option[value="${catId}"]`);
+  return opt ? opt.textContent : null;
 }
 
 // ================== CARGA TIPOS (desde la tabla tipos_producto) ==================
@@ -1223,6 +1267,7 @@ function renderPromos(promos) {
         : "https://via.placeholder.com/200x140?text=Sin+Imagen";
 
       const nombreEscapado = p.nombre.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      const categoriaEscapada = categoria.replace(/'/g, "\\'").replace(/"/g, "&quot;");
       const stock = p.stock || 0;
       let stockColor = stock < 5 ? (stock === 0 ? '#e74c3c' : '#f39c12') : '#27ae60';
       let stockText = stock === 0 ? '¡AGOTADO!' : `Stock: ${stock}`;
@@ -1244,7 +1289,7 @@ function renderPromos(promos) {
           <span id="cantidad-display-${p.id}" class="cantidad-display-card">1</span>
           <button class="btn-cantidad-mas" onclick="cambiarCantidadCard(${p.id}, 1)">+</button>
         </div>
-        <button class="add-to-cart-btn" style="margin-top:8px;" onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null})">Agregar</button>
+        <button class="add-to-cart-btn" style="margin-top:8px;" onclick="agregarAlCarritoDesdeCard(${p.id}, '${nombreEscapado}', ${p.precio}, ${p.precio_anterior || null}, '${categoriaEscapada}')">Agregar</button>
       `;
       wrapper.appendChild(card);
     });
@@ -1266,7 +1311,7 @@ function cambiarCantidadCard(id, cambio) {
   display.textContent = nuevaCantidad;
 }
 
-function agregarAlCarritoDesdeCard(id, nombre, precio, precio_anterior) {
+function agregarAlCarritoDesdeCard(id, nombre, precio, precio_anterior, categoria) {
   try {
     const cantidadDisplay = document.getElementById(`cantidad-display-${id}`);
     if (!cantidadDisplay) {
@@ -1277,7 +1322,7 @@ function agregarAlCarritoDesdeCard(id, nombre, precio, precio_anterior) {
     let cantidad = parseInt(cantidadDisplay.textContent, 10);
     if (isNaN(cantidad) || cantidad <= 0) cantidad = 1;
 
-    carritoLista(id, nombre, Number(precio) || 0, precio_anterior, cantidad);
+    carritoLista(id, nombre, Number(precio) || 0, precio_anterior, cantidad, categoria);
     cantidadDisplay.textContent = 1;
   } catch (e) {
     console.error("Error al agregar al carrito:", e);
@@ -1285,13 +1330,17 @@ function agregarAlCarritoDesdeCard(id, nombre, precio, precio_anterior) {
   }
 }
 
-function carritoLista(id, nombre, precio, precio_anterior = null, cantidadAAgregar = 1) {
+// categoria: nombre de la categoría del producto (si se conoce). Se guarda
+// en cada ítem del carrito para poder armar el resumen "por categoría" sin
+// tener que contar los productos de a uno.
+function carritoLista(id, nombre, precio, precio_anterior = null, cantidadAAgregar = 1, categoria = null) {
   try {
     const index = pedidoTemp.findIndex(item => String(item.id) === String(id));
     if (index !== -1) {
       pedidoTemp[index].cantidad += cantidadAAgregar;
+      if (!pedidoTemp[index].categoria && categoria) pedidoTemp[index].categoria = categoria;
     } else {
-      pedidoTemp.push({ id, nombre, precio: Number(precio) || 0, precio_anterior, cantidad: cantidadAAgregar });
+      pedidoTemp.push({ id, nombre, precio: Number(precio) || 0, precio_anterior, cantidad: cantidadAAgregar, categoria: categoria || null });
     }
     renderCarritoCliente();
   } catch (e) {
@@ -1475,7 +1524,7 @@ async function procesarComandoVoz(textoOriginal) {
     const primeraPalabra = nombre.split(" ")[0];
     const { data, error } = await sb
       .from("promociones")
-      .select("id, nombre, precio, precio_anterior, stock")
+      .select("id, nombre, precio, precio_anterior, stock, categoria_id")
       .ilike("nombre", `%${primeraPalabra}%`)
       .limit(25);
 
@@ -1505,7 +1554,7 @@ async function procesarComandoVoz(textoOriginal) {
       return;
     }
 
-    carritoLista(mejor.id, mejor.nombre, Number(mejor.precio) || 0, mejor.precio_anterior, cantidadFinal);
+    carritoLista(mejor.id, mejor.nombre, Number(mejor.precio) || 0, mejor.precio_anterior, cantidadFinal, nombreCategoriaPorId(mejor.categoria_id));
     actualizarEstadoDictado(`✅ Agregado: ${cantidadFinal}x ${mejor.nombre}`);
     registrarLogDictado(`✅ "${textoOriginal}" → ${cantidadFinal}x ${mejor.nombre}`);
 
@@ -1532,7 +1581,7 @@ async function buscarProductoEnLinea(texto) {
   buscarLineaTimer = setTimeout(async () => {
     const { data, error } = await sb
       .from("promociones")
-      .select("id, nombre, precio, stock")
+      .select("id, nombre, precio, stock, categoria_id")
       .ilike("nombre", `%${texto}%`)
       .limit(12);
     if (error || !data || data.length === 0) { sug.style.display = "none"; return; }
@@ -1540,11 +1589,13 @@ async function buscarProductoEnLinea(texto) {
     sug.innerHTML = data.map(p => {
       const stock = p.stock ?? 0;
       const stockColor = stock === 0 ? '#e74c3c' : (stock < 5 ? '#f39c12' : '#27ae60');
+      const categoriaNombre = nombreCategoriaPorId(p.categoria_id) || "";
+      const categoriaEscapada = categoriaNombre.replace(/'/g,"\\'").replace(/"/g,"&quot;");
       return `
-      <div onclick="seleccionarSugerencia(${p.id}, '${p.nombre.replace(/'/g,"\\'").replace(/"/g,"&quot;")}', ${p.precio})"
+      <div onclick="seleccionarSugerencia(${p.id}, '${p.nombre.replace(/'/g,"\\'").replace(/"/g,"&quot;")}', ${p.precio}, '${categoriaEscapada}')"
         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:14px;display:flex;justify-content:space-between;align-items:center;"
         onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">
-        <span>${p.nombre} <span style="color:${stockColor};font-weight:600;">(${stock})</span></span>
+        <span>${p.nombre} <span style="color:${stockColor};font-weight:600;">(${stock})</span>${categoriaNombre ? ` <span style="color:#94a3b8;font-size:11px;">· ${categoriaNombre}</span>` : ""}</span>
         <span style="color:#2980b9;font-weight:700;font-size:13px;">$${p.precio.toFixed(2)}</span>
       </div>
     `;
@@ -1589,11 +1640,12 @@ window.addEventListener("scroll", () => {
   if (sug && sug.style.display === "block") posicionarSugerencias();
 }, true);
 
-function seleccionarSugerencia(id, nombre, precio) {
+function seleccionarSugerencia(id, nombre, precio, categoria = "") {
   document.getElementById("inputNuevoProducto").value = nombre;
   document.getElementById("inputNuevoPrecio").value = precio.toFixed(2);
   document.getElementById("inputNuevoPrecio").dataset.productoId = id;
   document.getElementById("inputNuevoPrecio").dataset.productoNombre = nombre;
+  document.getElementById("inputNuevoPrecio").dataset.productoCategoria = categoria || "";
   cerrarSugerencias();
 }
 
@@ -1612,11 +1664,23 @@ window.addEventListener("resize", () => {
   if (sug && sug.style.display === "block") posicionarSugerencias();
 });
 
+// Cantidad del formulario de "agregar producto manual" (stepper -/cantidad/+,
+// igual que en las tarjetas del catálogo, para cargar rápido sin escribir).
+function cambiarCantidadManual(cambio) {
+  const input = document.getElementById("inputNuevaCantidad");
+  const display = document.getElementById("displayCantidadManual");
+  let nuevaCantidad = (parseInt(input.value, 10) || 1) + cambio;
+  if (nuevaCantidad < 1) nuevaCantidad = 1;
+  input.value = nuevaCantidad;
+  if (display) display.textContent = nuevaCantidad;
+}
+
 function agregarLineaManual() {
   const nombre = document.getElementById("inputNuevoProducto").value.trim();
   const cantidad = parseInt(document.getElementById("inputNuevaCantidad").value) || 1;
   const precio = parseFloat(document.getElementById("inputNuevoPrecio").value);
   const idDataset = document.getElementById("inputNuevoPrecio").dataset.productoId;
+  const categoriaDataset = document.getElementById("inputNuevoPrecio").dataset.productoCategoria || null;
 
   if (!nombre) { alert("Ingresá el nombre del producto."); return; }
   if (isNaN(precio) || precio < 0) { alert("Ingresá un precio válido."); return; }
@@ -1627,18 +1691,26 @@ function agregarLineaManual() {
   const index = pedidoTemp.findIndex(item => String(item.id) === String(id));
   if (index !== -1) {
     pedidoTemp[index].cantidad += cantidad;
+    if (!pedidoTemp[index].categoria && categoriaDataset) pedidoTemp[index].categoria = categoriaDataset;
   } else {
-    pedidoTemp.push({ id, nombre, precio, precio_anterior: null, cantidad });
+    pedidoTemp.push({ id, nombre, precio, precio_anterior: null, cantidad, categoria: categoriaDataset });
   }
 
-  // Limpiar fila de entrada
+  // Limpiar fila de entrada y volver a cantidad 1
   document.getElementById("inputNuevoProducto").value = "";
   document.getElementById("inputNuevaCantidad").value = "1";
+  const displayCant = document.getElementById("displayCantidadManual");
+  if (displayCant) displayCant.textContent = "1";
   document.getElementById("inputNuevoPrecio").value = "";
   delete document.getElementById("inputNuevoPrecio").dataset.productoId;
   delete document.getElementById("inputNuevoPrecio").dataset.productoNombre;
+  delete document.getElementById("inputNuevoPrecio").dataset.productoCategoria;
 
   renderCarritoCliente();
+
+  // Foco de nuevo en el buscador para poder seguir cargando productos
+  // rápido, sin tener que tocar el campo de nombre con el dedo otra vez.
+  document.getElementById("inputNuevoProducto").focus();
 }
 
 function renderCarritoCliente() {
@@ -1694,7 +1766,7 @@ function renderCarritoCliente() {
         <td style="padding:8px;text-align:right;width:100px;">
           <input type="number" value="${precioNum.toFixed(2)}" step="0.01" min="0"
             style="width:80px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:5px;font-size:14px;text-align:right;margin:0;"
-            onchange="actualizarPrecioEnCarrito(${index}, this.value)">
+            onchange="actualizarPrecioEnCarrito('${p.id}', this.value)">
         </td>
         <td style="padding:8px;text-align:right;font-weight:700;color:#1e293b;width:100px;">
           $${(precioNum * cantidadNum).toFixed(2)}
@@ -1742,12 +1814,91 @@ function recalcularTotales() {
     document.getElementById("headerCarritoTotal").textContent = `$${totalCalc.toFixed(2)}`;
     badge.style.display = cantidad > 0 ? "block" : "none";
   }
+  const btnResumenCat = document.getElementById("btnResumenCategorias");
+  if (btnResumenCat) btnResumenCat.style.display = cantidad > 0 ? "block" : "none";
+
+  // Si el modal de resumen por categoría está abierto (ej. lo dejaron
+  // abierto mientras siguen tocando el catálogo), lo refrescamos en vivo.
+  const modalResumen = document.getElementById("modalResumenCategorias");
+  if (modalResumen && modalResumen.style.display === "flex") renderResumenPorCategoria();
   const sticky = document.getElementById("carritoSticky");
   if (sticky) {
     sticky.style.display = cantidad > 0 ? "flex" : "none";
     document.getElementById("stickyCount").textContent  = cantidad;
     document.getElementById("stickyTotal").textContent  = `$${totalCalc.toFixed(2)}`;
   }
+}
+
+// ==========================================
+// RESUMEN POR CATEGORÍA (modal)
+// ==========================================
+// Agrupa lo que ya está en el carrito por categoría y muestra, por cada
+// una, el detalle de qué producto y cuántas unidades van. Pensado para
+// no tener que contar de a una las tinturas (u otra categoría) delante
+// del cliente: con un vistazo alcanza.
+function abrirResumenCategorias() {
+  renderResumenPorCategoria();
+  document.getElementById("modalResumenCategorias").style.display = "flex";
+}
+
+function cerrarResumenCategorias() {
+  document.getElementById("modalResumenCategorias").style.display = "none";
+}
+
+function renderResumenPorCategoria() {
+  const cont = document.getElementById("listaResumenCategorias");
+  if (!cont) return;
+
+  if (pedidoTemp.length === 0) {
+    cont.innerHTML = `<p style="text-align:center;color:#94a3b8;padding:24px 0;">El carrito está vacío.</p>`;
+    document.getElementById("resumenCategoriasTotalItems").textContent = "0 productos";
+    document.getElementById("resumenCategoriasTotalMonto").textContent = "$0.00";
+    return;
+  }
+
+  // Los productos manuales, dictados por voz sin coincidencia de categoría,
+  // o cargados desde un pedido viejo guardado sin ese dato, van agrupados
+  // en "Sin categoría" en vez de romper el resumen.
+  const grupos = {};
+  pedidoTemp.forEach(p => {
+    const cat = p.categoria || "Sin categoría";
+    if (!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(p);
+  });
+
+  const nombresOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b, "es"));
+
+  cont.innerHTML = nombresOrdenados.map(cat => {
+    const items = grupos[cat];
+    const totalCantidad = items.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
+    const totalMonto = items.reduce((s, p) => s + (Number(p.precio) || 0) * (Number(p.cantidad) || 0), 0);
+
+    const filas = items
+      .slice()
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+      .map(p => `
+        <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 2px;font-size:13px;color:#334155;border-bottom:1px solid #f1f5f9;">
+          <span>${p.nombre}</span>
+          <span style="font-weight:700;color:#1e293b;white-space:nowrap;">${p.cantidad} u.</span>
+        </div>
+      `).join("");
+
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;background:#eff6ff;border-radius:8px;padding:8px 10px;">
+          <span style="font-weight:700;color:#1e3a5f;font-size:14px;">${cat}</span>
+          <span style="background:#2980b9;color:white;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap;">${totalCantidad} u.</span>
+        </div>
+        <div style="padding:2px 4px 0;">${filas}</div>
+        <div style="text-align:right;font-size:12px;color:#64748b;padding:4px 4px 0;">Subtotal: <b style="color:#e74c3c;">$${totalMonto.toFixed(2)}</b></div>
+      </div>
+    `;
+  }).join("");
+
+  const totalItems = pedidoTemp.reduce((s, p) => s + (Number(p.cantidad) || 0), 0);
+  const totalMontoGeneral = pedidoTemp.reduce((s, p) => s + (Number(p.precio) || 0) * (Number(p.cantidad) || 0), 0);
+  document.getElementById("resumenCategoriasTotalItems").textContent = `${totalItems} producto(s) en total`;
+  document.getElementById("resumenCategoriasTotalMonto").textContent = `$${totalMontoGeneral.toFixed(2)}`;
 }
 
 function eliminarItemCarrito(id) {
@@ -1762,12 +1913,19 @@ function actualizarCantidadEnCarrito(id, nuevaCantidad) {
   renderCarritoCliente();
 }
 
-function actualizarPrecioEnCarrito(index, nuevoPrecio) {
+function actualizarPrecioEnCarrito(id, nuevoPrecio) {
   const precio = parseFloat(nuevoPrecio);
+  const prod = pedidoTemp.find(p => String(p.id) === String(id));
+  if (!prod) return;
+
   if (!isNaN(precio) && precio >= 0) {
-    pedidoTemp[index].precio = precio;
-    recalcularTotales();
-    guardarEstadoLocal();
+    prod.precio = precio;
+    // Antes solo se llamaba a recalcularTotales(), que actualiza el total
+    // general pero no el subtotal de esa misma fila del carrito: por eso
+    // parecía que el cambio de precio "no se aplicaba". Con el re-render
+    // completo, el subtotal de la línea y el total quedan siempre en
+    // sincronía con el precio que se acaba de editar.
+    renderCarritoCliente();
   } else {
     alert("Ingresá un precio válido.");
     renderCarritoCliente();
