@@ -589,11 +589,7 @@
       🎤
     </button>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;">
-    <button id="btnResumenCategorias" onclick="abrirResumenCategorias()" title="Ver cuántos productos van por categoría"
-      style="display:none;background:rgba(255,255,255,0.25);color:white;border:none;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">📊 Categorías</button>
-    <button id="headerCarritoBadge" onclick="scrollAlCarrito()">🛒 <span id="headerCarritoCount">0</span> — <span id="headerCarritoTotal">$0</span></button>
-  </div>
+  <button id="headerCarritoBadge" onclick="scrollAlCarrito()">🛒 <span id="headerCarritoCount">0</span> — <span id="headerCarritoTotal">$0</span></button>
 </header>
 
 <div id="panelDictadoVoz" style="display:none;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:8px 16px;">
@@ -623,6 +619,8 @@
   <div id="seccionCarrito">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
       <h3 style="margin:0;">📋 Presupuesto (<span id="carritoCount">0</span> ítems)</h3>
+      <button id="btnResumenCategorias" onclick="abrirResumenCategorias()" title="Ver cuántos productos van por categoría"
+        style="display:none;background:#2980b9;color:white;border:none;border-radius:99px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">📊 Ver por categoría</button>
     </div>
 
     <div style="overflow-x:auto;">
@@ -876,6 +874,15 @@
 let promosCache = []; 
 let isSaving = false; // Bloqueo para evitar envíos dobles
 let searchTimer; // Para el Debounce
+
+// Lleva la pantalla hasta la sección del carrito (Presupuesto), con scroll
+// suave. La usan el badge del header, la barra flotante y el botón de
+// "Ver carrito". (Esta función faltaba antes: se la llamaba desde varios
+// botones pero nunca estaba definida, por eso tiraba el error.)
+function scrollAlCarrito() {
+  const el = document.getElementById("seccionCarrito");
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 
 
