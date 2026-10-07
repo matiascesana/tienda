@@ -1949,7 +1949,7 @@ async function consultarPedidosCliente() {
     // 1. Traemos la columna 'archivado' que es la que define el estado real
     const { data: pedidos, error } = await sb
       .from("pedidos")
-      .select("id, created_at, total, productos, cliente, archivado, pagos") 
+      .select("*") 
       .ilike("dni", `%${dni}%`)
       .order("created_at", { ascending: false });
 
@@ -2003,6 +2003,9 @@ async function consultarPedidosCliente() {
         pedidoTemp = [];
         pedidoExistenteId = p.id;
         checklistPreparacion = {}; // evita arrastrar marcas de control de OTRO pedido
+        // restaura el descuento guardado en ESTE pedido (0 si no tenía)
+        const descCarga = document.getElementById("inputDescuento");
+        if (descCarga) descCarga.value = String(parseFloat(p.descuento) || 0);
         
         if (Array.isArray(p.productos)) {
           p.productos.forEach(prod => {
@@ -2017,6 +2020,10 @@ async function consultarPedidosCliente() {
         }
         
         renderCarritoCliente();
+        // respeta exactamente el total que se había guardado (con descuento / redondeo)
+        const ctCarga = document.getElementById("carritoTotal");
+        if (ctCarga && p.total != null) ctCarga.value = (parseFloat(p.total) || 0).toFixed(2);
+        guardarEstadoLocal();
         document.body.removeChild(modal);
       };
       
@@ -2045,7 +2052,7 @@ let isProcessingOrder = false;
 
 async function confirmarPedido() {
   // 1. Bloqueo de seguridad: evita múltiples envíos
-  if (isProcessingOrder) return;
+  if (isProcessingOrder) return false;
 
   const nombreCliente = document.getElementById("clienteNombre").value.trim();
   const localidadId = document.getElementById("clienteLocalidad").value;
@@ -2053,12 +2060,12 @@ async function confirmarPedido() {
 
   if (!nombreCliente || !localidadId || !dni) {
     alert("⚠️ Por favor, complete nombre, DNI y localidad.");
-    return;
+    return false;
   }
 
   if (pedidoTemp.length === 0) {
     alert("🛒 El carrito está vacío.");
-    return;
+    return false;
   }
 
   // Activamos el bloqueo
@@ -2101,14 +2108,28 @@ async function confirmarPedido() {
       pedidoExistenteId = idResultante;
     }
 
+    // Guardamos el % de descuento junto al pedido (el total ya viene con el descuento aplicado).
+    // Requiere la columna "descuento" en la tabla pedidos; si no existe, no se corta el guardado.
+    try {
+      const descPctGuardar = parseFloat(document.getElementById("inputDescuento")?.value) || 0;
+      const { error: errDesc } = await sb.from("pedidos")
+        .update({ descuento: descPctGuardar })
+        .eq("id", pedidoExistenteId);
+      if (errDesc) console.warn("No se pudo guardar el descuento (¿falta la columna 'descuento'?):", errDesc.message);
+    } catch (e) {
+      console.warn("No se pudo guardar el descuento:", e);
+    }
+
     console.log("Pedido guardado y stock sincronizado.");
 
     // 4. FINALIZACIÓN
     document.getElementById("modalPDF").style.display = "flex";
+    return true;
 
   } catch (err) {
     console.error("Error crítico en confirmarPedido:", err);
     alert("❌ Error: " + (err.message || "No se pudo procesar el pedido"));
+    return false;
   } finally {
     // 5. Liberamos el bloqueo siempre, incluso si hubo error
     isProcessingOrder = false;
@@ -2123,7 +2144,8 @@ async function guardarYDescargarDirecto() {
     try {
         // 1. Ejecutamos la confirmación y ESPERAMOS a que termine (usando await)
         // Esto asegura que pedidoExistenteId tenga valor antes de seguir
-        await confirmarPedido(); 
+        const guardado = await confirmarPedido();
+        if (!guardado) return; // validación o error: no descargamos ni borramos nada
 
         // 2. Descargamos el PDF
         descargarPDF();
@@ -2160,6 +2182,9 @@ function reiniciarPedido() {
     document.getElementById("busquedaPromo").value = "";
     document.getElementById("categoriaSelect").value = "";
     document.getElementById("tipoSelect").value = "";
+    // Descuento general: siempre vuelve a 0 para que no se arrastre al próximo cliente
+    const descEl = document.getElementById("inputDescuento");
+    if (descEl) descEl.value = "0";
     
     // 4. Limpiar contenedores
     document.getElementById("productosContainer").innerHTML = "";
@@ -2562,6 +2587,12 @@ function descargarPDF(esPago = false, listaPagos = [], saldoPendienteReal = null
   const totalPedido = _ctEl ? (parseFloat(_ctEl.value) || 0)
     : pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
   let ahorroTotal = 0;
+
+  // Descuento: se captura ahora (antes de que reiniciarPedido() lo ponga en 0)
+  const subtotalPedido = pedidoTemp.reduce((acc, p) => acc + (parseFloat(p.precio) || 0) * (p.cantidad || 0), 0);
+  const descPct = parseFloat(document.getElementById("inputDescuento")?.value) || 0;
+  const descMonto = subtotalPedido * (descPct / 100);
+  const ajusteTotal = totalPedido - (subtotalPedido - descMonto); // redondeo manual del total final
   
   const productos = pedidoTemp.map(p => {
     const subtotal = p.precio * p.cantidad;
@@ -2630,12 +2661,37 @@ function descargarPDF(esPago = false, listaPagos = [], saldoPendienteReal = null
 
     const finalY = doc.lastAutoTable.finalY || 100;
     
+    let yTot = finalY + 12;
+    if (yTot + 35 > 280) { doc.addPage(); yTot = 20; }
+
+    // Subtotal y descuento (solo si corresponde)
+    if (descPct > 0 || Math.abs(ajusteTotal) >= 0.01) {
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(0);
+      doc.text(`Subtotal: $${subtotalPedido.toFixed(2)}`, 196, yTot, { align: "right" });
+      yTot += 6;
+      if (descPct > 0) {
+        doc.setTextColor(231, 76, 60);
+        doc.text(`Descuento (${descPct}%): -$${descMonto.toFixed(2)}`, 196, yTot, { align: "right" });
+        doc.setTextColor(0);
+        yTot += 6;
+      }
+      if (Math.abs(ajusteTotal) >= 0.01) {
+        doc.text(`Ajuste: ${ajusteTotal < 0 ? "-" : ""}$${Math.abs(ajusteTotal).toFixed(2)}`, 196, yTot, { align: "right" });
+        yTot += 6;
+      }
+      yTot += 3;
+    } else {
+      yTot += 3;
+    }
+
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL PEDIDO: $${totalPedido.toFixed(2)}`, 130, finalY + 15);
+    doc.text(`TOTAL PEDIDO: $${totalPedido.toFixed(2)}`, 196, yTot, { align: "right" });
 
     // --- SALDO PENDIENTE (solo si se registró algún pago en este PDF) ---
-    let offsetSiguiente = finalY + 15;
+    let offsetSiguiente = yTot;
     if (esPago && listaPagos && listaPagos.length > 0) {
       // Si nos pasaron el saldo real ya calculado (total - pagos previos - pagos nuevos)
       // lo usamos; si no, lo calculamos solo con los pagos de este comprobante.
@@ -2647,14 +2703,14 @@ function descargarPDF(esPago = false, listaPagos = [], saldoPendienteReal = null
       offsetSiguiente += 8;
       doc.setFontSize(12);
       doc.setTextColor(saldoAMostrar > 0 ? 231 : 39, saldoAMostrar > 0 ? 76 : 174, saldoAMostrar > 0 ? 60 : 96);
-      doc.text(`SALDO PENDIENTE: $${saldoAMostrar.toFixed(2)}`, 130, offsetSiguiente);
+      doc.text(`SALDO PENDIENTE: $${saldoAMostrar.toFixed(2)}`, 196, offsetSiguiente, { align: "right" });
       doc.setTextColor(0);
     }
 
     if (ahorroTotal > 0) {
       doc.setFontSize(11);
       doc.setTextColor(39, 174, 96);
-      doc.text(`Ahorro total: $${ahorroTotal.toFixed(2)}`, 14, finalY + 15);
+      doc.text(`Ahorro total: $${ahorroTotal.toFixed(2)}`, 14, yTot);
     }
 
     doc.save(`Pedido_${nombreCliente.replace(/\s+/g, '_')}.pdf`);
