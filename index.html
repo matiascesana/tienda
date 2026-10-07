@@ -2005,7 +2005,7 @@ async function consultarPedidosCliente() {
         checklistPreparacion = {}; // evita arrastrar marcas de control de OTRO pedido
         // restaura el descuento guardado en ESTE pedido (0 si no tenía)
         const descCarga = document.getElementById("inputDescuento");
-        if (descCarga) descCarga.value = String(parseFloat(p.descuento) || 0);
+        if (descCarga) descCarga.value = String(parseFloat(p.descuento_general) || 0);
         
         if (Array.isArray(p.productos)) {
           p.productos.forEach(prod => {
@@ -2109,13 +2109,14 @@ async function confirmarPedido() {
     }
 
     // Guardamos el % de descuento junto al pedido (el total ya viene con el descuento aplicado).
-    // Requiere la columna "descuento" en la tabla pedidos; si no existe, no se corta el guardado.
+    // Se guarda en la columna "descuento_general" (la misma que usa el panel de administración).
+    // Si el guardado del descuento falla, no se corta el guardado del pedido.
     try {
       const descPctGuardar = parseFloat(document.getElementById("inputDescuento")?.value) || 0;
       const { error: errDesc } = await sb.from("pedidos")
-        .update({ descuento: descPctGuardar })
+        .update({ descuento_general: descPctGuardar })
         .eq("id", pedidoExistenteId);
-      if (errDesc) console.warn("No se pudo guardar el descuento (¿falta la columna 'descuento'?):", errDesc.message);
+      if (errDesc) console.warn("No se pudo guardar el descuento (¿falta la columna 'descuento_general'?):", errDesc.message);
     } catch (e) {
       console.warn("No se pudo guardar el descuento:", e);
     }
