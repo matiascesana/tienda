@@ -896,6 +896,421 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let todasLasPromos = [];
 let pedidoTemp = [];
 let pedidoExistenteId = null;
+
+// ================== PRECIOS: PROMO TEMPORAL + CAJA CERRADA ==================
+// Un solo stock (en unidades) por producto. La promo y la caja solo cambian el PRECIO por unidad.
+const PROMO_COLS = "id, nombre, precio, precio_anterior, stock, categoria_id, tipo_id, imagen, unidades_por_caja, precio_caja, promo_activa, promo_precio, promo_cupo";
+const productosPorId = {};
+let pedidoOrigCombo = {}; // unidades de combo que el pedido (en edición) ya tenía reservadas, por combo
+let pedidoOrigPromo = {}; // unidades de promo que el pedido (en edición) ya tenía reservadas, por producto
+
+function registrarProductos(lista) {
+  (lista || []).forEach(p => { if (p && p.id != null) productosPorId[p.id] = Object.assign(productosPorId[p.id] || {}, p); });
+}
+
+async function precargarInfoProductos(ids) {
+  const faltan = [...new Set((ids || []).filter(id => /^\d+$/.test(String(id)) && !productosPorId[id]))];
+  if (!faltan.length) return;
+  const { data } = await sb.from("promociones").select(PROMO_COLS).in("id", faltan);
+  registrarProductos(data);
+}
+
+function promoVigente(p) {
+  return !!(p && p.promo_activa && Number(p.promo_precio) > 0 && (parseInt(p.promo_cupo, 10) || 0) > 0);
+}
+
+// cupoExtra: unidades de promo que el pedido (al editarlo) ya tenía reservadas.
+// sinPromo: true para no aplicar la promo (líneas viejas de un pedido que no la tenían).
+function precioVigente(p, cant, cupoExtra, sinPromo) {
+  const base = Number(p && p.precio) || 0;
+  cant = parseInt(cant, 10) || 0;
+  if (!p) return { precio: base, promo: false, caja: false };
+  const cupo = (parseInt(p.promo_cupo, 10) || 0) + (cupoExtra || 0);
+  if (!sinPromo && p.promo_activa && Number(p.promo_precio) > 0 && cant > 0 && cant <= cupo) {
+    return { precio: Number(p.promo_precio), promo: true, caja: false };
+  }
+  const upc = parseInt(p.unidades_por_caja, 10) || 0;
+  const pc = Number(p.precio_caja) || 0;
+  if (upc > 1 && pc > 0 && cant >= upc) {
+    const pu = Math.round((pc / upc) * 10000) / 10000;
+    if (pu < base) return { precio: pu, promo: false, caja: true };
+  }
+  return { precio: base, promo: false, caja: false };
+}
+
+// Recalcula precio/flags de una línea del carrito según su cantidad (salvo precio editado a mano).
+function repreciarLinea(item) {
+  if (!item || item.precioManual) return;
+  const info = productosPorId[item.id];
+  if (!info) return;
+  const pv = precioVigente(info, item.cantidad, pedidoOrigPromo[item.id] || 0, !!item.promoBloqueada);
+  item.precio = pv.precio;
+  item.promo = pv.promo;
+  item.caja = pv.caja;
+  item.precio_anterior = pv.promo ? (Number(info.precio) || 0) : (item._pa0 || null);
+}
+
+function precioHTMLCard(p) {
+  const base = Number(p.precio) || 0;
+  let h;
+  if (promoVigente(p)) {
+    h = `<p style="text-align:center;"><span style="text-decoration:line-through;color:#888;font-size:12px;">$${base.toFixed(2)}</span><br>
+         <span style="color:#e74c3c;font-weight:bold;">$${Number(p.promo_precio).toFixed(2)}</span><br>
+         <span style="font-size:11px;color:#d35400;font-weight:bold;">🔥 Promo · quedan ${parseInt(p.promo_cupo, 10) || 0}</span></p>`;
+  } else if (p.precio_anterior && p.precio_anterior > p.precio) {
+    h = `<p style="text-align:center;"><span style="text-decoration:line-through;color:#888;font-size:12px;">$${p.precio_anterior.toFixed(2)}</span><br>
+         <span style="color:#e74c3c;font-weight:bold;">$${base.toFixed(2)}</span></p>`;
+  } else {
+    h = `<p style="color:#e74c3c;font-weight:bold;">$${base.toFixed(2)}</p>`;
+  }
+  if (p.promo_activa && !promoVigente(p)) h += `<div style="font-size:11px;color:#c0392b;text-align:center;font-weight:bold;">🔥 Promo agotada</div>`;
+  const upc = parseInt(p.unidades_por_caja, 10) || 0;
+  if (upc > 1 && Number(p.precio_caja) > 0) {
+    h += `<div style="font-size:11px;color:#27ae60;text-align:center;font-weight:bold;">📦 x${upc}: $${(Number(p.precio_caja) / upc).toFixed(2)} c/u</div>`;
+  }
+  return h;
+}
+
+// ==================== COMBOS / PROMOS POR VOLUMEN (misma lógica que el panel) ====================
+// El combo NO es un producto: es una regla. Los productos siguen con su único stock.
+//   REQUISITOS : condiciones que se cumplen TODAS a la vez ("N de una categoría" o "N de un producto").
+//   REGALOS    : uno o más productos; se ELIGE entre ellos (ej: oxidante 10, 20, 30 o 40 vol).
+//   BENEFICIO  : sin cargo (100%), % de descuento o precio especial por unidad.
+//   REPETIR    : un beneficio por cada grupo completo (24 tinturas = 2 regalos).
+// El vendedor/cliente ELIGE qué promo usar (combosElegidos). Las promos que piden lo mismo
+// (ej: misma categoría de tinturas con distinta cantidad) son excluyentes entre sí.
+// La línea del producto en promo queda con un precio promedio (unidades con beneficio + unidades que se pagan)
+// y marca combo_id / combo_unid. Compatibilidad: los combos viejos (categoria_id + unidades_requeridas +
+// regalo_producto_id) siguen funcionando.
+window.combosActivos = window.combosActivos || [];
+let combosElegidos = []; // ids de los combos que se decidió usar en este pedido
+
+async function cargarCombos() {
+  try {
+    const { data, error } = await sb.from('combos').select('*').eq('activo', true).order('id');
+    if (error) throw error;
+    window.combosActivos = data || [];
+  } catch (e) {
+    console.warn('No se pudieron cargar los combos (¿falta ejecutar la migración de combos?):', e);
+    window.combosActivos = [];
+  }
+}
+
+function mapaCombos(lineas) {
+  const m = {};
+  (lineas || []).forEach(l => {
+    if (l && l.combo_id && Number(l.combo_unid) > 0) m[l.combo_id] = (m[l.combo_id] || 0) + (Number(l.combo_unid) || 0);
+  });
+  return m;
+}
+
+function combosRestante(c, origCombos) {
+  const total = parseInt(c.cupo_total, 10) || 0;
+  const usado = parseInt(c.cupo_usado, 10) || 0;
+  return Math.max(0, total - usado + ((origCombos || {})[c.id] || 0));
+}
+
+function escCombo(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function comboMoney(n) {
+  return (Number(n) || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 });
+}
+
+function comboJson(v) {
+  if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return null; } }
+  return v;
+}
+
+// Requisitos del combo (con fallback a las columnas viejas)
+function comboRequisitos(c) {
+  const r = comboJson(c.requisitos);
+  if (Array.isArray(r) && r.length) return r;
+  return [{ tipo: 'categoria', id: c.categoria_id, nombre: c.categoria_nombre || 'la categoría', cantidad: parseInt(c.unidades_requeridas, 10) || 0 }];
+}
+
+// Productos entre los que se puede elegir el beneficio (con fallback a las columnas viejas)
+function comboRegalos(c) {
+  const r = comboJson(c.regalos);
+  if (Array.isArray(r) && r.length) return r;
+  return c.regalo_producto_id ? [{ id: c.regalo_producto_id, nombre: c.regalo_nombre || '' }] : [];
+}
+
+function comboEsPrecioEspecial(c) {
+  return c.beneficio_tipo === 'precio' && c.precio_especial !== null && c.precio_especial !== undefined && c.precio_especial !== '';
+}
+
+function comboBeneficioTxt(c) {
+  if (comboEsPrecioEspecial(c)) return `a precio especial ($${comboMoney(c.precio_especial)} c/u)`;
+  const d = (c.descuento_pct === null || c.descuento_pct === undefined) ? 100 : Number(c.descuento_pct);
+  return d >= 100 ? 'sin cargo' : `con ${d}% de descuento`;
+}
+
+function comboPrecioUnitBenef(c, base) {
+  if (comboEsPrecioEspecial(c)) return Math.min(base, Math.max(0, Number(c.precio_especial) || 0));
+  const d = (c.descuento_pct === null || c.descuento_pct === undefined) ? 100 : Math.min(100, Math.max(0, Number(c.descuento_pct)));
+  return base * (1 - d / 100);
+}
+
+// Dos combos "compiten" si piden lo mismo (misma categoría o mismo producto)
+function comboClaves(c) {
+  return comboRequisitos(c)
+    .filter(r => r && r.id !== null && r.id !== undefined && r.id !== '')
+    .map(r => `${r.tipo === 'producto' ? 'producto' : 'categoria'}:${r.id}`);
+}
+
+function esComboElegido(c) {
+  return combosElegidos.some(id => String(id) === String(c.id));
+}
+
+// Cuántas unidades lleva el cliente de cada requisito (los productos en promo no cuentan para el requisito)
+function progresoCombo(c, lineas) {
+  const reqs = comboRequisitos(c).filter(r => r && r.id !== null && r.id !== undefined && r.id !== '' && (parseInt(r.cantidad, 10) || 0) > 0);
+  const regalos = comboRegalos(c);
+  const giftIds = new Set(regalos.map(r => String(r.id)));
+  const progreso = reqs.map(r => ({ nombre: r.nombre || '', tipo: r.tipo, req: parseInt(r.cantidad, 10), tiene: 0 }));
+  lineas.forEach(l => {
+    if (giftIds.has(String(l.id))) return;
+    const info = productosPorId[l.id];
+    const cant = Number(l.cantidad) || 0;
+    reqs.forEach((r, i) => {
+      const coincide = r.tipo === 'producto'
+        ? String(l.id) === String(r.id)
+        : !!(info && String(info.categoria_id) === String(r.id));
+      if (coincide) progreso[i].tiene += cant;
+    });
+  });
+  const grupos = progreso.length ? Math.min(...progreso.map(p => Math.floor(p.tiene / p.req))) : 0;
+  return { reqs, regalos, giftIds, progreso, grupos };
+}
+
+// Aplica los combos ELEGIDOS a las líneas (idempotente). origCombos: unidades de combo que el pedido ya tenía reservadas (edición).
+// Devuelve { cambio, estado, disponibles }: estado = combos en uso; disponibles = todas las promos vigentes con su progreso.
+function aplicarCombos(lineas, origCombos) {
+  const combos = window.combosActivos || [];
+  const sig = () => lineas.map(l => `${l.id}:${l.precio}:${l.combo_id || ''}:${l.combo_unid || 0}`).join('|');
+  const antes = sig();
+
+  // 1) Quitar el efecto previo (solo de combos que siguen activos; los pausados quedan "congelados")
+  lineas.forEach(l => {
+    if (!l.combo_id) return;
+    if (!combos.some(c => String(c.id) === String(l.combo_id))) return;
+    if (l._pc !== undefined && l._pc !== null && l.precio_base !== undefined && l.precio_base !== null && Number(l.precio) === Number(l._pc)) {
+      l.precio = Number(l.precio_base);
+      l.precio_anterior = (l._pa_prev === undefined ? null : l._pa_prev);
+    }
+    delete l.combo_id; delete l.combo_unid; delete l.precio_base; delete l._pc; delete l._pa_prev;
+  });
+
+  // 2) Promos vigentes (con cupo) y su progreso. Se desmarcan las elegidas que ya no cumplen los requisitos.
+  const vigentes = combos.filter(c => combosRestante(c, origCombos) > 0);
+  const disponibles = vigentes.map(c => Object.assign({ combo: c }, progresoCombo(c, lineas)));
+  combosElegidos = combosElegidos.filter(id => disponibles.some(d => String(d.combo.id) === String(id) && d.grupos >= 1));
+  disponibles.forEach(d => { d.elegido = esComboElegido(d.combo); });
+
+  // 3) Aplicar cada combo elegido
+  const estado = [];
+  disponibles.filter(d => d.elegido).forEach(d => {
+    const c = d.combo;
+    const { reqs, regalos, giftIds, progreso, grupos } = d;
+    if (!reqs.length || !regalos.length) return;
+    const veces = c.repetir ? grupos : (grupos >= 1 ? 1 : 0);
+    const ganados = veces * (parseInt(c.regalo_cantidad, 10) || 1);
+    const restante = combosRestante(c, origCombos);
+
+    // Repartir las unidades ganadas entre los productos elegidos (en orden del carrito)
+    let pendiente = Math.min(ganados, restante);
+    let aplicados = 0;
+    const detalle = [];
+    lineas.forEach(l => {
+      if (pendiente <= 0) return;
+      if (!giftIds.has(String(l.id)) || l.combo_id || l.precioManual) return;
+      const cant = Number(l.cantidad) || 0;
+      const ap = Math.min(pendiente, cant);
+      if (ap <= 0) return;
+      const base = Number(l.precio) || 0;
+      const unit = comboPrecioUnitBenef(c, base);
+      const nuevo = Math.round(((base * (cant - ap)) + (unit * ap)) / cant * 10000) / 10000;
+      l._pa_prev = (l.precio_anterior === undefined ? null : l.precio_anterior);
+      l.precio_base = base;
+      l._pc = nuevo;
+      l.precio = nuevo;
+      l.precio_anterior = base;
+      l.combo_id = c.id;
+      l.combo_unid = ap;
+      pendiente -= ap;
+      aplicados += ap;
+      detalle.push({ nombre: l.nombre, unidades: ap });
+    });
+
+    estado.push({ combo: c, progreso, regalos, detalle, ganados, aplicados, restante,
+                  falta: Math.max(0, Math.min(ganados, restante) - aplicados) });
+  });
+  return { cambio: antes !== sig(), estado, disponibles };
+}
+
+// Elegir / quitar una promo. Las que piden lo mismo se desmarcan entre sí.
+function toggleComboElegido(id) {
+  const c = (window.combosActivos || []).find(x => String(x.id) === String(id));
+  if (!c) return;
+  if (esComboElegido(c)) {
+    combosElegidos = combosElegidos.filter(x => String(x) !== String(id));
+  } else {
+    const mias = comboClaves(c);
+    combosElegidos = combosElegidos.filter(x => {
+      const o = (window.combosActivos || []).find(y => String(y.id) === String(x));
+      return o && !comboClaves(o).some(k => mias.includes(k));
+    });
+    combosElegidos.push(c.id);
+  }
+  renderCarritoCliente();
+}
+
+// Descuenta (delta>0) o devuelve (delta<0) cupo de combos. Devuelve avisos de cupo bajo/agotado.
+async function ajustarCuposCombos(orig, nuevo) {
+  const msgs = [];
+  const ids = new Set([...Object.keys(orig || {}), ...Object.keys(nuevo || {})]);
+  for (const id of ids) {
+    const delta = ((nuevo || {})[id] || 0) - ((orig || {})[id] || 0);
+    if (!delta) continue;
+    const { data: c } = await sb.from('combos').select('*').eq('id', id).maybeSingle();
+    if (!c) continue;
+    const usado = Math.max(0, (parseInt(c.cupo_usado, 10) || 0) + delta);
+    await sb.from('combos').update({ cupo_usado: usado }).eq('id', id);
+    const rest = (parseInt(c.cupo_total, 10) || 0) - usado;
+    const nom = comboRegalos(c).map(r => r.nombre).join(' / ') || 'producto en promo';
+    if (delta > 0 && rest <= 0) msgs.push(`⚠️ Se AGOTÓ el cupo del combo "${c.nombre}" (${nom}). Ya no ofrecerlo.`);
+    else if (delta > 0 && rest <= 5) msgs.push(`ℹ️ Combo "${c.nombre}": quedan ${rest} en promo.`);
+  }
+  return msgs;
+}
+
+// Panel de promos dentro del carrito: combos en uso, regalos por elegir y promos disponibles para usar.
+function bannerCombosHTML(res) {
+  const disponibles = (res && res.disponibles) || [];
+  if (!disponibles.length) return '';
+  const partes = [];
+
+  const hayAlcanzada = disponibles.some(d => d.grupos >= 1);
+  if (!combosElegidos.length && hayAlcanzada) {
+    partes.push(`<div style="color:#b45309;font-weight:bold;margin-bottom:6px;">⚠️ Cumple los requisitos de una promo: elegí cuál usar 👇</div>`);
+  }
+
+  (res.estado || []).forEach(e => {
+    const c = e.combo;
+    const benef = comboBeneficioTxt(c);
+    const cn = escCombo(c.nombre);
+    const multi = e.regalos.length > 1;
+    const quedan = Math.max(0, e.restante - e.aplicados);
+    const bloque = [`<div style="color:#166534;font-weight:bold;">✅ En uso: "${cn}"</div>`];
+    e.detalle.forEach(d => bloque.push(`<div style="color:#166534;">🎁 <b>${escCombo(d.nombre)}</b> ×${d.unidades} ${benef} · quedan ${quedan} en promo</div>`));
+    if (e.ganados > e.restante) bloque.push(`<div style="color:#c0392b;">Cupo limitado: solo quedan ${e.restante} en promo</div>`);
+    if (e.falta > 0) {
+      const btns = e.regalos.map(r =>
+        `<button type="button" onclick="agregarRegaloCombo(${c.id}, '${escCombo(r.id)}')" style="margin:2px 4px 2px 0;padding:3px 10px;border:none;border-radius:6px;background:#f39c12;color:#fff;font-weight:bold;cursor:pointer;">+ ${escCombo(r.nombre)}</button>`).join('');
+      bloque.push(`<div style="color:#92400e;">🎁 Ganó ${e.falta} × ${benef}. ${multi ? 'Elegí cuál agregar:' : 'Agregalo:'} ${btns}</div>`);
+    }
+    partes.push(`<div style="margin-bottom:8px;">${bloque.join('')}</div>`);
+  });
+
+  const cards = disponibles.map(d => {
+    const c = d.combo;
+    const cant = parseInt(c.regalo_cantidad, 10) || 1;
+    const reqTxt = d.progreso.map(p => `<b>${p.req}</b> × ${escCombo(p.nombre)}`).join(' + ');
+    const queTxt = d.regalos.length > 1
+      ? `<b>${cant}</b> a elección entre <b>${d.regalos.map(r => escCombo(r.nombre)).join(' / ')}</b>`
+      : `<b>${cant} × ${escCombo((d.regalos[0] || {}).nombre || '')}</b>`;
+    const progTxt = d.progreso.map(p => `${escCombo(p.nombre)}: ${p.tiene}/${p.req}`).join(' · ');
+    const alcanza = d.grupos >= 1;
+    const faltan = d.progreso.filter(p => p.tiene < p.req).map(p => `${p.req - p.tiene} × ${escCombo(p.nombre)}`).join(' y ');
+    const accion = alcanza
+      ? `<button type="button" onclick="toggleComboElegido(${c.id})" style="margin-top:4px;padding:5px 12px;border:none;border-radius:6px;font-weight:bold;cursor:pointer;${d.elegido ? 'background:#fff;color:#c0392b;border:1px solid #f5b7b1;' : 'background:#1e3a8a;color:#fff;'}">${d.elegido ? 'Quitar esta promo' : 'Usar esta promo'}</button>`
+      : `<div style="color:#c2410c;font-weight:bold;margin-top:2px;">Faltan ${faltan}</div>`;
+    return `<div style="padding:6px 8px;margin-top:6px;border-radius:8px;border:1px solid ${d.elegido ? '#4ade80' : '#e5e7eb'};background:${d.elegido ? '#f0fdf4' : '#fff'};">
+      <div style="font-weight:bold;color:#1e293b;">${escCombo(c.nombre)}</div>
+      <div style="color:#475569;">Llevando ${reqTxt}: ${queTxt} ${comboBeneficioTxt(c)}${c.repetir ? ' (se repite por cada grupo completo)' : ''}</div>
+      <div style="color:#94a3b8;font-size:12px;">${progTxt} · quedan ${d.combo ? combosRestante(c, pedidoOrigCombo) : 0} en promo</div>
+      ${accion}
+    </div>`;
+  }).join('');
+  partes.push(`<div style="font-weight:bold;color:#92400e;">🎁 Promos vigentes</div>${cards}`);
+
+  return `<div style="margin:8px 0;padding:8px 10px;background:#fffbe6;border:1px solid #f0c419;border-radius:8px;font-size:13px;line-height:1.5;">${partes.join('')}</div>`;
+}
+
+function bannerComboFila(res) {
+  const h = bannerCombosHTML(res);
+  return h ? `<tr><td colspan="5" style="padding:4px 8px;">${h}</td></tr>` : '';
+}
+
+// Agrega 1 unidad del producto elegido (se repite hasta completar los regalos ganados)
+async function agregarRegaloCombo(comboId, productoId) {
+  const c = (window.combosActivos || []).find(x => x.id == comboId);
+  if (!c) return;
+  const r = comboRegalos(c).find(x => String(x.id) === String(productoId)) || comboRegalos(c)[0];
+  if (!r) return;
+  await precargarInfoProductos([r.id]);
+  const { data: fresh } = await sb.from("promociones").select(PROMO_COLS).eq("id", r.id).maybeSingle();
+  if (fresh) registrarProductos([fresh]);
+  const p = productosPorId[r.id];
+  if (!p) { alert("No se encontró el producto en promoción."); return; }
+  const stock = Number(p.stock) || 0;
+  const ex = pedidoTemp.find(x => String(x.id) === String(p.id));
+  const actual = ex ? (Number(ex.cantidad) || 0) : 0;
+  const nueva = Math.min(actual + 1, stock);
+  if (nueva <= actual) { alert('Sin stock disponible de "' + p.nombre + '".'); return; }
+  if (ex) {
+    ex.cantidad = nueva;
+    repreciarLinea(ex);
+  } else {
+    pedidoTemp.push({ id: p.id, nombre: p.nombre, precio: Number(p.precio) || 0, precio_anterior: p.precio_anterior || null,
+                      _pa0: p.precio_anterior || null, cantidad: nueva, categoria: nombreCategoriaPorId(p.categoria_id) });
+    repreciarLinea(pedidoTemp[pedidoTemp.length - 1]);
+  }
+  renderCarritoCliente();
+}
+
+// Después de guardar el pedido: descuenta/devuelve el cupo de promo y se asegura de que
+// las líneas guardadas conserven la marca "promo" (la usa el panel al editar/eliminar).
+async function postGuardadoPromos() {
+  try {
+    // Cupo de combos (el producto en promo ya descontó su stock normal en procesar_stock_pedido)
+    const nuevoCombo = mapaCombos(pedidoTemp);
+    const msgsCombo = await ajustarCuposCombos(pedidoOrigCombo, nuevoCombo);
+    pedidoOrigCombo = nuevoCombo;
+    await cargarCombos();
+    if (msgsCombo.length) alert(msgsCombo.join("\n"));
+
+    const nuevo = {};
+    pedidoTemp.forEach(p => {
+      if (p.promo && /^\d+$/.test(String(p.id))) nuevo[p.id] = (nuevo[p.id] || 0) + (Number(p.cantidad) || 0);
+    });
+    const ids = new Set([...Object.keys(nuevo), ...Object.keys(pedidoOrigPromo)]);
+    for (const id of ids) {
+      const delta = (nuevo[id] || 0) - (pedidoOrigPromo[id] || 0);
+      if (!delta) continue;
+      const { data: pr } = await sb.from("promociones").select("promo_cupo").eq("id", id).single();
+      if (!pr) continue;
+      const cupoNuevo = Math.max(0, (parseInt(pr.promo_cupo, 10) || 0) - delta);
+      await sb.from("promociones").update({ promo_cupo: cupoNuevo }).eq("id", id);
+      if (productosPorId[id]) productosPorId[id].promo_cupo = cupoNuevo;
+    }
+    pedidoOrigPromo = nuevo;
+
+    if (pedidoExistenteId && (Object.keys(nuevo).length || ids.size || Object.keys(nuevoCombo).length)) {
+      const { data: row } = await sb.from("pedidos").select("productos").eq("id", pedidoExistenteId).single();
+      const guardados = (row && row.productos) || [];
+      const falta = pedidoTemp.some(p => {
+        const g = guardados.find(x => String(x.id) === String(p.id)) || {};
+        return !!p.promo !== !!g.promo || (Number(p.combo_unid) || 0) !== (Number(g.combo_unid) || 0);
+      });
+      if (falta) await sb.from("pedidos").update({ productos: pedidoTemp }).eq("id", pedidoExistenteId);
+    }
+  } catch (e) {
+    console.warn("No se pudo actualizar el cupo de la promoción:", e);
+  }
+}
 // Progreso del checklist de preparación: { [productoId]: { checked, cantidad } }
 let checklistPreparacion = {};
 
@@ -920,6 +1335,9 @@ function guardarEstadoLocal() {
       dni: document.getElementById("dni").value,
       clienteLocalidad: document.getElementById("clienteLocalidad").value,
       pedidoExistenteId: pedidoExistenteId,
+      origPromo: pedidoOrigPromo,
+      origCombo: pedidoOrigCombo,
+      combosElegidos: combosElegidos,
       totalFinal: ctEl ? ctEl.value : null,
       descuento: document.getElementById("inputDescuento")?.value || "0",
       checklistPreparacion: checklistPreparacion
@@ -932,7 +1350,7 @@ function guardarEstadoLocal() {
   }
 }
 
-  function cargarEstadoLocal() {
+  async function cargarEstadoLocal() {
   const guardado = localStorage.getItem("pedido_respaldo");
   if (guardado) {
     try {
@@ -940,6 +1358,10 @@ function guardarEstadoLocal() {
       
       // Recuperar productos
       pedidoTemp = datos.pedidoTemp || [];
+      pedidoOrigPromo = datos.origPromo || {};
+      pedidoOrigCombo = datos.origCombo || {};
+      combosElegidos = Array.isArray(datos.combosElegidos) ? datos.combosElegidos : [];
+      await precargarInfoProductos(pedidoTemp.map(p => p.id)); // necesario para recalcular combos al restaurar
       pedidoExistenteId = datos.pedidoExistenteId || null;
       checklistPreparacion = datos.checklistPreparacion || {};
       
@@ -1035,7 +1457,7 @@ async function cargarCategorias() {
   }
   
   const select = document.getElementById("categoriaSelect");
-  select.innerHTML = '<option value="">Seleccionar categoría...</option>';
+  select.innerHTML = '<option value="">Seleccionar categoría...</option><option value="__promos__">🔥 Promociones</option>';
   
   data.forEach(cat => {
     const opt = document.createElement("option");
@@ -1207,9 +1629,11 @@ async function filtrarProductos() {
   }
 
   // Consulta dinámica a Supabase
-  let query = sb.from("promociones").select("id, nombre, precio, precio_anterior, stock, categoria_id, tipo_id, imagen");
+  let query = sb.from("promociones").select(PROMO_COLS);
 
-  if (catId) {
+  if (catId === "__promos__") {
+    query = query.eq("promo_activa", true).gt("promo_cupo", 0);
+  } else if (catId) {
     query = query.eq("categoria_id", catId);
   }
 
@@ -1231,6 +1655,7 @@ async function filtrarProductos() {
 
   // Renderizado
   promosCache = data || [];
+  registrarProductos(promosCache);
   renderPromos(promosCache);
 }
 
@@ -1279,10 +1704,7 @@ function renderPromos(promos) {
       let stockColor = stock < 5 ? (stock === 0 ? '#e74c3c' : '#f39c12') : '#27ae60';
       let stockText = stock === 0 ? '¡AGOTADO!' : `Stock: ${stock}`;
 
-      let precioHTML = p.precio_anterior && p.precio_anterior > p.precio 
-        ? `<p style="text-align:center;"><span style="text-decoration:line-through;color:#888;font-size:12px;">$${p.precio_anterior.toFixed(2)}</span><br>
-           <span style="color:#e74c3c;font-weight:bold;">$${p.precio.toFixed(2)}</span></p>`
-        : `<p style="color:#e74c3c;font-weight:bold;">$${p.precio.toFixed(2)}</p>`;
+      let precioHTML = precioHTMLCard(p);
 
       const card = document.createElement("div");
       card.className = "promo-card";
@@ -1346,8 +1768,10 @@ function carritoLista(id, nombre, precio, precio_anterior = null, cantidadAAgreg
     if (index !== -1) {
       pedidoTemp[index].cantidad += cantidadAAgregar;
       if (!pedidoTemp[index].categoria && categoria) pedidoTemp[index].categoria = categoria;
+      repreciarLinea(pedidoTemp[index]);
     } else {
-      pedidoTemp.push({ id, nombre, precio: Number(precio) || 0, precio_anterior, cantidad: cantidadAAgregar, categoria: categoria || null });
+      pedidoTemp.push({ id, nombre, precio: Number(precio) || 0, precio_anterior, _pa0: precio_anterior || null, cantidad: cantidadAAgregar, categoria: categoria || null });
+      repreciarLinea(pedidoTemp[pedidoTemp.length - 1]);
     }
     renderCarritoCliente();
   } catch (e) {
@@ -1360,6 +1784,7 @@ function modificarCantidad(id, cambio) {
   const producto = pedidoTemp.find(p => String(p.id) === String(id));
   if (!producto) return;
   producto.cantidad += cambio;
+  repreciarLinea(producto);
   if (producto.cantidad <= 0) pedidoTemp = pedidoTemp.filter(p => String(p.id) !== String(id));
   renderCarritoCliente();
 }
@@ -1531,7 +1956,7 @@ async function procesarComandoVoz(textoOriginal) {
     const primeraPalabra = nombre.split(" ")[0];
     const { data, error } = await sb
       .from("promociones")
-      .select("id, nombre, precio, precio_anterior, stock, categoria_id")
+      .select(PROMO_COLS)
       .ilike("nombre", `%${primeraPalabra}%`)
       .limit(25);
 
@@ -1543,6 +1968,7 @@ async function procesarComandoVoz(textoOriginal) {
       return;
     }
 
+    registrarProductos(data);
     let mejor = null, mejorPuntaje = 0;
     data.forEach(p => {
       const puntaje = puntajeSimilitudTexto(nombre, p.nombre);
@@ -1588,10 +2014,11 @@ async function buscarProductoEnLinea(texto) {
   buscarLineaTimer = setTimeout(async () => {
     const { data, error } = await sb
       .from("promociones")
-      .select("id, nombre, precio, stock, categoria_id")
+      .select(PROMO_COLS)
       .ilike("nombre", `%${texto}%`)
       .limit(12);
     if (error || !data || data.length === 0) { sug.style.display = "none"; return; }
+    registrarProductos(data);
 
     sug.innerHTML = data.map(p => {
       const stock = p.stock ?? 0;
@@ -1698,9 +2125,15 @@ function agregarLineaManual() {
   const index = pedidoTemp.findIndex(item => String(item.id) === String(id));
   if (index !== -1) {
     pedidoTemp[index].cantidad += cantidad;
+    repreciarLinea(pedidoTemp[index]);
     if (!pedidoTemp[index].categoria && categoriaDataset) pedidoTemp[index].categoria = categoriaDataset;
   } else {
-    pedidoTemp.push({ id, nombre, precio, precio_anterior: null, cantidad, categoria: categoriaDataset });
+    const infoM = productosPorId[id];
+    const esManual = !!infoM && Math.abs(precio - Number(infoM.precio)) > 0.005; // si cambió el precio a mano, se respeta
+    const nuevaLinea = { id, nombre, precio, precio_anterior: null, _pa0: null, cantidad, categoria: categoriaDataset };
+    if (esManual) nuevaLinea.precioManual = true;
+    pedidoTemp.push(nuevaLinea);
+    repreciarLinea(nuevaLinea);
   }
 
   // Limpiar fila de entrada y volver a cantidad 1
@@ -1726,6 +2159,7 @@ function renderCarritoCliente() {
     if (!tbody) return;
 
     const panelTotales = document.getElementById("panelTotales");
+    const resCombos = aplicarCombos(pedidoTemp, pedidoOrigCombo);
 
     if (pedidoTemp.length === 0) {
       tbody.innerHTML = `<tr id="filaVacia"><td colspan="5" style="text-align:center;padding:20px;color:#888;font-size:14px;">Agregá productos desde el catálogo o usá el buscador de abajo</td></tr>`;
@@ -1751,13 +2185,13 @@ function renderCarritoCliente() {
       return;
     }
 
-    tbody.innerHTML = pedidoTemp.map((p, index) => {
+    tbody.innerHTML = bannerComboFila(resCombos) + pedidoTemp.map((p, index) => {
       const precioNum = Number(p.precio) || 0;
       const cantidadNum = Number(p.cantidad) || 0;
       return `
       <tr style="border-bottom:1px solid #f1f5f9;${index % 2 === 0 ? "background:#fff" : "background:#f8fafc"}">
         <td style="padding:10px 8px;">
-          <span style="font-weight:600;color:#1e293b;">${p.nombre}</span>
+          <span style="font-weight:600;color:#1e293b;">${p.nombre}</span>${p.promo ? '<div style="font-size:11px;color:#d35400;font-weight:bold;">🔥 Precio promo</div>' : (p.caja ? '<div style="font-size:11px;color:#27ae60;font-weight:bold;">📦 Precio por caja</div>' : '')}${p.combo_id ? `<div style="font-size:11px;color:#b45309;font-weight:bold;">🎁 Combo (${p.combo_unid} ud. en promo)</div>` : ''}
         </td>
         <td style="padding:8px;text-align:center;width:90px;">
           <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
@@ -1916,7 +2350,7 @@ function eliminarItemCarrito(id) {
 function actualizarCantidadEnCarrito(id, nuevaCantidad) {
   const cant = parseInt(nuevaCantidad);
   if (isNaN(cant) || cant <= 0) { pedidoTemp = pedidoTemp.filter(p => String(p.id) !== String(id)); }
-  else { const prod = pedidoTemp.find(p => String(p.id) === String(id)); if (prod) prod.cantidad = cant; }
+  else { const prod = pedidoTemp.find(p => String(p.id) === String(id)); if (prod) { prod.cantidad = cant; repreciarLinea(prod); } }
   renderCarritoCliente();
 }
 
@@ -1927,6 +2361,9 @@ function actualizarPrecioEnCarrito(id, nuevoPrecio) {
 
   if (!isNaN(precio) && precio >= 0) {
     prod.precio = precio;
+    prod.precioManual = true; // precio editado a mano: no se reprecia ni consume cupo de promo
+    prod.promo = false;
+    prod.caja = false;
     // Antes solo se llamaba a recalcularTotales(), que actualiza el total
     // general pero no el subtotal de esa misma fila del carrito: por eso
     // parecía que el cambio de precio "no se aplicaba". Con el re-render
@@ -1994,7 +2431,7 @@ async function consultarPedidosCliente() {
         </div>
       `;
       
-      btn.onclick = () => {
+      btn.onclick = async () => {
         // 3. Si está archivado, podrías avisar que no es editable o simplemente dejarlo ver
         if (esArchivado) {
             alert("Este pedido ya está archivado y no puede modificarse. Se cargará solo para visualización.");
@@ -2014,10 +2451,35 @@ async function consultarPedidosCliente() {
               nombre: prod.nombre,
               precio: prod.precio,
               precio_anterior: prod.precio_anterior || 0,
+              _pa0: prod.promo ? null : (prod.precio_anterior || null),
+              promo: !!prod.promo,
+              promoBloqueada: !prod.promo, // las líneas viejas sin promo no pasan a promo al editar
+              combo_id: prod.combo_id || null,
+              combo_unid: prod.combo_unid || 0,
+              precio_base: prod.precio_base ?? null,
+              _pc: prod._pc ?? null,
+              _pa_prev: prod._pa_prev ?? null,
               cantidad: prod.cantidad
             });
           });
         }
+
+        // Cupo de promo que este pedido ya tenía reservado + info actual de los productos
+        pedidoOrigCombo = mapaCombos(pedidoTemp);
+        combosElegidos = Object.keys(pedidoOrigCombo);
+        pedidoOrigPromo = {};
+        pedidoTemp.forEach(l => {
+          if (l.promo && /^\d+$/.test(String(l.id))) pedidoOrigPromo[l.id] = (pedidoOrigPromo[l.id] || 0) + (Number(l.cantidad) || 0);
+        });
+        await precargarInfoProductos(pedidoTemp.map(l => l.id));
+        pedidoTemp.forEach(l => {
+          const info = productosPorId[l.id];
+          if (!info) return;
+          const pv = precioVigente(info, l.cantidad, pedidoOrigPromo[l.id] || 0, !!l.promoBloqueada);
+          const precioComparar = (l.combo_id && l.precio_base != null) ? Number(l.precio_base) : Number(l.precio);
+          if (Math.abs(pv.precio - precioComparar) > 0.005) l.precioManual = true; // precio distinto al automático: se respeta
+          else if (pv.caja) l.caja = true;
+        });
         
         renderCarritoCliente();
         // respeta exactamente el total que se había guardado (con descuento / redondeo)
@@ -2080,6 +2542,24 @@ async function confirmarPedido() {
   const fechaISO = new Date().toISOString();
 
   try {
+    // 1b. Combos con el cupo fresco de la base (pudo agotarse mientras se armaba el pedido)
+    await cargarCombos();
+    const chkCombos = aplicarCombos(pedidoTemp, pedidoOrigCombo);
+    if (chkCombos.cambio) {
+      renderCarritoCliente();
+      alert("⚠️ La disponibilidad de la promo cambió. Revisá el carrito y volvé a confirmar.");
+      return false;
+    }
+    const regalosPendientes = chkCombos.estado.reduce((a, e) => a + e.falta, 0);
+    if (regalosPendientes > 0 &&
+        !confirm(`Ganó ${regalosPendientes} producto(s) de la promo que todavía no agregó. ¿Confirmar el pedido sin ellos?`)) {
+      return false;
+    }
+    if (!combosElegidos.length && chkCombos.disponibles.some(d => d.grupos >= 1) &&
+        !confirm("Cumple los requisitos de una promo que todavía no eligió. ¿Confirmar el pedido sin usarla?")) {
+      return false;
+    }
+
     // 2. GESTIÓN DE CLIENTE: Usamos upsert optimizado
     await sb.from("clientes").upsert({ 
         nombre_completo: nombreCliente, 
@@ -2107,6 +2587,9 @@ async function confirmarPedido() {
     if (!pedidoExistenteId) {
       pedidoExistenteId = idResultante;
     }
+
+    // Cupo de la promoción (el stock ya lo descontó procesar_stock_pedido)
+    await postGuardadoPromos();
 
     // Guardamos el % de descuento junto al pedido (el total ya viene con el descuento aplicado).
     // Se guarda en la columna "descuento_general" (la misma que usa el panel de administración).
@@ -2173,6 +2656,9 @@ function reiniciarPedido() {
     pedidoTemp = [];
     pedidoExistenteId = null; // <--- CRÍTICO: Esto evita que el nuevo pedido pise al anterior
     checklistPreparacion = {};
+    pedidoOrigPromo = {};
+    pedidoOrigCombo = {};
+    combosElegidos = [];
     pagosTemporales = [];
     pagosPreviosBD = [];
 
@@ -2738,6 +3224,7 @@ function cerrarModalPago() {
 // ================== INICIALIZACIÓN ==================
 window.addEventListener("DOMContentLoaded", async () => {
   await cargarCategorias();
+  await cargarCombos();
   await cargarTipos();
   await cargarLocalidades();
   // Se eliminó cualquier llamada a cargar productos aquí
