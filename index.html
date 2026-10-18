@@ -823,6 +823,18 @@
   </div>
 </div>
 
+<!-- Modal promos vigentes: la lista de promos se abre con el botón del carrito -->
+<div id="modalPromosVigentes" onclick="if(event.target===this)cerrarPromosVigentes()" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);justify-content:center;align-items:center;z-index:3600;padding:15px;">
+  <div style="background:white;padding:22px;border-radius:14px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h2 style="margin:0;font-size:18px;color:#92400e;">🎁 Promos vigentes</h2>
+      <button onclick="cerrarPromosVigentes()" style="background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:#94a3b8;padding:0 4px;">×</button>
+    </div>
+    <div id="listaPromosVigentes" style="font-size:13px;line-height:1.5;"></div>
+    <button onclick="cerrarPromosVigentes()" style="width:100%;margin-top:14px;padding:12px;background:#2980b9;color:white;border:none;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;">Cerrar</button>
+  </div>
+</div>
+
 <!-- Modal pagos -->
 <div id="modalPago" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);justify-content:center;align-items:center;z-index:4000;padding:15px;">
   <div style="background:white;padding:25px;border-radius:14px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto;">
@@ -899,7 +911,7 @@ let pedidoExistenteId = null;
 
 // ================== PRECIOS: PROMO TEMPORAL + CAJA CERRADA ==================
 // Un solo stock (en unidades) por producto. La promo y la caja solo cambian el PRECIO por unidad.
-const PROMO_COLS = "id, nombre, precio, precio_anterior, stock, categoria_id, tipo_id, imagen, unidades_por_caja, precio_caja, promo_activa, promo_precio, promo_cupo";
+const PROMO_COLS = "id, nombre, precio, precio_anterior, stock, categoria_id, tipo_id, imagen, unidades_por_caja, precio_caja, precios_escalonados, promo_activa, promo_precio, promo_cupo";
 const productosPorId = {};
 let pedidoOrigCombo = {}; // unidades de combo que el pedido (en edición) ya tenía reservadas, por combo
 let pedidoOrigPromo = {}; // unidades de promo que el pedido (en edición) ya tenía reservadas, por producto
@@ -929,13 +941,29 @@ function precioVigente(p, cant, cupoExtra, sinPromo) {
   if (!sinPromo && p.promo_activa && Number(p.promo_precio) > 0 && cant > 0 && cant <= cupo) {
     return { precio: Number(p.promo_precio), promo: true, caja: false };
   }
+  // Candidatos: precio por caja cerrada y escala por cantidad. Gana el más barato para el cliente.
+  let mejor = base, esCaja = false, escala = null;
   const upc = parseInt(p.unidades_por_caja, 10) || 0;
   const pc = Number(p.precio_caja) || 0;
   if (upc > 1 && pc > 0 && cant >= upc) {
     const pu = Math.round((pc / upc) * 10000) / 10000;
-    if (pu < base) return { precio: pu, promo: false, caja: true };
+    if (pu < mejor) { mejor = pu; esCaja = true; }
   }
-  return { precio: base, promo: false, caja: false };
+  const esc = escalasDe(p);
+  for (let i = 0; i < esc.length; i++) {
+    if (cant >= esc[i].min && esc[i].precio < mejor) { mejor = esc[i].precio; esCaja = false; escala = esc[i].min; }
+  }
+  return { precio: mejor, promo: false, caja: esCaja, escala: escala };
+}
+
+// precios_escalonados (jsonb) = [{"min":5,"precio":900},{"min":10,"precio":800}, ...] sobre el MISMO stock.
+function escalasDe(p) {
+  let r = p && p.precios_escalonados;
+  if (typeof r === 'string') { try { r = JSON.parse(r); } catch (e) { r = null; } }
+  if (!Array.isArray(r)) return [];
+  return r.map(x => ({ min: parseInt(x.min, 10) || 0, precio: Number(x.precio) || 0 }))
+          .filter(x => x.min > 1 && x.precio > 0)
+          .sort((a, b) => a.min - b.min);
 }
 
 // Recalcula precio/flags de una línea del carrito según su cantidad (salvo precio editado a mano).
@@ -947,6 +975,7 @@ function repreciarLinea(item) {
   item.precio = pv.precio;
   item.promo = pv.promo;
   item.caja = pv.caja;
+  item.escala = pv.escala || null;
   item.precio_anterior = pv.promo ? (Number(info.precio) || 0) : (item._pa0 || null);
 }
 
@@ -967,6 +996,10 @@ function precioHTMLCard(p) {
   const upc = parseInt(p.unidades_por_caja, 10) || 0;
   if (upc > 1 && Number(p.precio_caja) > 0) {
     h += `<div style="font-size:11px;color:#27ae60;text-align:center;font-weight:bold;">📦 x${upc}: $${(Number(p.precio_caja) / upc).toFixed(2)} c/u</div>`;
+  }
+  const _esc = escalasDe(p);
+  if (_esc.length) {
+    h += `<div style="font-size:11px;color:#2980b9;text-align:center;font-weight:bold;">📊 ${_esc.map(e => 'x' + e.min + ': $' + e.precio.toFixed(2)).join(' · ')}</div>`;
   }
   return h;
 }
@@ -1187,9 +1220,23 @@ async function ajustarCuposCombos(orig, nuevo) {
 }
 
 // Panel de promos dentro del carrito: combos en uso, regalos por elegir y promos disponibles para usar.
+function abrirPromosVigentes() {
+  const m = document.getElementById('modalPromosVigentes');
+  if (m) m.style.display = 'flex';
+}
+function cerrarPromosVigentes() {
+  const m = document.getElementById('modalPromosVigentes');
+  if (m) m.style.display = 'none';
+}
+
 function bannerCombosHTML(res) {
   const disponibles = (res && res.disponibles) || [];
-  if (!disponibles.length) return '';
+  if (!disponibles.length) {
+    const ml = document.getElementById('listaPromosVigentes');
+    if (ml) ml.innerHTML = '';
+    cerrarPromosVigentes();
+    return '';
+  }
   const partes = [];
 
   const hayAlcanzada = disponibles.some(d => d.grupos >= 1);
@@ -1234,7 +1281,11 @@ function bannerCombosHTML(res) {
       ${accion}
     </div>`;
   }).join('');
-  partes.push(`<div style="font-weight:bold;color:#92400e;">🎁 Promos vigentes</div>${cards}`);
+  // La lista de promos vive en un modal (se mantiene actualizada al elegir/quitar una promo)
+  const modalLista = document.getElementById('listaPromosVigentes');
+  if (modalLista) modalLista.innerHTML = cards;
+  const hayAlc = disponibles.some(d => d.grupos >= 1);
+  partes.push(`<button type="button" onclick="abrirPromosVigentes()" style="width:100%;padding:8px 12px;border:none;border-radius:8px;font-weight:bold;font-size:13px;cursor:pointer;background:${hayAlc ? '#f39c12' : '#fde68a'};color:${hayAlc ? '#fff' : '#92400e'};">🎁 Promos vigentes (${disponibles.length})${hayAlc ? ' · ¡cumplís una!' : ''}</button>`);
 
   return `<div style="margin:8px 0;padding:8px 10px;background:#fffbe6;border:1px solid #f0c419;border-radius:8px;font-size:13px;line-height:1.5;">${partes.join('')}</div>`;
 }
@@ -2191,7 +2242,7 @@ function renderCarritoCliente() {
       return `
       <tr style="border-bottom:1px solid #f1f5f9;${index % 2 === 0 ? "background:#fff" : "background:#f8fafc"}">
         <td style="padding:10px 8px;">
-          <span style="font-weight:600;color:#1e293b;">${p.nombre}</span>${p.promo ? '<div style="font-size:11px;color:#d35400;font-weight:bold;">🔥 Precio promo</div>' : (p.caja ? '<div style="font-size:11px;color:#27ae60;font-weight:bold;">📦 Precio por caja</div>' : '')}${p.combo_id ? `<div style="font-size:11px;color:#b45309;font-weight:bold;">🎁 Combo (${p.combo_unid} ud. en promo)</div>` : ''}
+          <span style="font-weight:600;color:#1e293b;">${p.nombre}</span>${p.promo ? '<div style="font-size:11px;color:#d35400;font-weight:bold;">🔥 Precio promo</div>' : (p.caja ? '<div style="font-size:11px;color:#27ae60;font-weight:bold;">📦 Precio por caja</div>' : (p.escala ? '<div style="font-size:11px;color:#2980b9;font-weight:bold;">📊 Precio por cantidad (desde ' + p.escala + ' u.)</div>' : ''))}${p.combo_id ? `<div style="font-size:11px;color:#b45309;font-weight:bold;">🎁 Combo (${p.combo_unid} ud. en promo)</div>` : ''}
         </td>
         <td style="padding:8px;text-align:center;width:90px;">
           <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
@@ -2364,6 +2415,7 @@ function actualizarPrecioEnCarrito(id, nuevoPrecio) {
     prod.precioManual = true; // precio editado a mano: no se reprecia ni consume cupo de promo
     prod.promo = false;
     prod.caja = false;
+    prod.escala = null;
     // Antes solo se llamaba a recalcularTotales(), que actualiza el total
     // general pero no el subtotal de esa misma fila del carrito: por eso
     // parecía que el cambio de precio "no se aplicaba". Con el re-render
@@ -2479,6 +2531,7 @@ async function consultarPedidosCliente() {
           const precioComparar = (l.combo_id && l.precio_base != null) ? Number(l.precio_base) : Number(l.precio);
           if (Math.abs(pv.precio - precioComparar) > 0.005) l.precioManual = true; // precio distinto al automático: se respeta
           else if (pv.caja) l.caja = true;
+          else if (pv.escala) l.escala = pv.escala;
         });
         
         renderCarritoCliente();
