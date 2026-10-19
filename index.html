@@ -1017,6 +1017,7 @@ function precioHTMLCard(p) {
 // regalo_producto_id) siguen funcionando.
 window.combosActivos = window.combosActivos || [];
 let combosElegidos = []; // ids de los combos que se decidió usar en este pedido
+let combosDescartados = []; // combos que el usuario quitó a mano: no se vuelven a aplicar solos mientras cumpla los requisitos
 
 async function cargarCombos() {
   try {
@@ -1102,16 +1103,21 @@ function progresoCombo(c, lineas) {
   const reqs = comboRequisitos(c).filter(r => r && r.id !== null && r.id !== undefined && r.id !== '' && (parseInt(r.cantidad, 10) || 0) > 0);
   const regalos = comboRegalos(c);
   const giftIds = new Set(regalos.map(r => String(r.id)));
-  const progreso = reqs.map(r => ({ nombre: r.nombre || '', tipo: r.tipo, req: parseInt(r.cantidad, 10), tiene: 0 }));
+  const giftQty = parseInt(c.regalo_cantidad, 10) || 1;
+  // ¿el producto de regalo es también parte del requisito? (ej: "llevando 2 sérum, 1 sérum de regalo")
+  const coincideReq = (r, id, info) => r.tipo === 'producto'
+    ? String(id) === String(r.id)
+    : !!(info && String(info.categoria_id) === String(r.id));
+  const solapa = reqs.map(r => regalos.some(g => coincideReq(r, g.id, productosPorId[g.id])));
+  // Si solapa, cada grupo necesita los pagos + los de regalo (2 + 1 = 3 unidades en el carrito)
+  const progreso = reqs.map((r, i) => ({ nombre: r.nombre || '', tipo: r.tipo, req: (parseInt(r.cantidad, 10) || 0) + (solapa[i] ? giftQty : 0), tiene: 0 }));
   lineas.forEach(l => {
-    if (giftIds.has(String(l.id))) return;
     const info = productosPorId[l.id];
     const cant = Number(l.cantidad) || 0;
+    const esRegalo = giftIds.has(String(l.id));
     reqs.forEach((r, i) => {
-      const coincide = r.tipo === 'producto'
-        ? String(l.id) === String(r.id)
-        : !!(info && String(info.categoria_id) === String(r.id));
-      if (coincide) progreso[i].tiene += cant;
+      if (esRegalo && !solapa[i]) return;
+      if (coincideReq(r, l.id, info)) progreso[i].tiene += cant;
     });
   });
   const grupos = progreso.length ? Math.min(...progreso.map(p => Math.floor(p.tiene / p.req))) : 0;
@@ -1140,6 +1146,25 @@ function aplicarCombos(lineas, origCombos) {
   const vigentes = combos.filter(c => combosRestante(c, origCombos) > 0);
   const disponibles = vigentes.map(c => Object.assign({ combo: c }, progresoCombo(c, lineas)));
   combosElegidos = combosElegidos.filter(id => disponibles.some(d => String(d.combo.id) === String(id) && d.grupos >= 1));
+  // Si dejó de cumplir los requisitos, se olvida el descarte manual (si vuelve a cumplirlos, se aplica de nuevo)
+  combosDescartados = combosDescartados.filter(id => disponibles.some(d => String(d.combo.id) === String(id) && d.grupos >= 1));
+
+  // 2b) AUTOMÁTICO: se aplican solas las promos que cumplen requisitos (salvo las quitadas a mano,
+  // las que compiten con otra ya elegida, o al editar un pedido ya guardado).
+  if (!pedidoExistenteId) {
+    disponibles.forEach(d => {
+      if (d.grupos < 1) return;
+      const c = d.combo;
+      if (esComboElegido(c)) return;
+      if (combosDescartados.some(x => String(x) === String(c.id))) return;
+      const mias = comboClaves(c);
+      const choca = combosElegidos.some(id => {
+        const o = combos.find(y => String(y.id) === String(id));
+        return o && comboClaves(o).some(k => mias.includes(k));
+      });
+      if (!choca) combosElegidos.push(c.id);
+    });
+  }
   disponibles.forEach(d => { d.elegido = esComboElegido(d.combo); });
 
   // 3) Aplicar cada combo elegido
@@ -1189,12 +1214,16 @@ function toggleComboElegido(id) {
   if (!c) return;
   if (esComboElegido(c)) {
     combosElegidos = combosElegidos.filter(x => String(x) !== String(id));
+    if (!combosDescartados.some(x => String(x) === String(id))) combosDescartados.push(c.id);
   } else {
     const mias = comboClaves(c);
     combosElegidos = combosElegidos.filter(x => {
       const o = (window.combosActivos || []).find(y => String(y.id) === String(x));
-      return o && !comboClaves(o).some(k => mias.includes(k));
+      const sigue = o && !comboClaves(o).some(k => mias.includes(k));
+      if (!sigue && !combosDescartados.some(d => String(d) === String(x))) combosDescartados.push(x);
+      return sigue;
     });
+    combosDescartados = combosDescartados.filter(x => String(x) !== String(id));
     combosElegidos.push(c.id);
   }
   renderCarritoCliente();
@@ -1389,6 +1418,7 @@ function guardarEstadoLocal() {
       origPromo: pedidoOrigPromo,
       origCombo: pedidoOrigCombo,
       combosElegidos: combosElegidos,
+      combosDescartados: combosDescartados,
       totalFinal: ctEl ? ctEl.value : null,
       descuento: document.getElementById("inputDescuento")?.value || "0",
       checklistPreparacion: checklistPreparacion
@@ -1412,6 +1442,7 @@ function guardarEstadoLocal() {
       pedidoOrigPromo = datos.origPromo || {};
       pedidoOrigCombo = datos.origCombo || {};
       combosElegidos = Array.isArray(datos.combosElegidos) ? datos.combosElegidos : [];
+      combosDescartados = Array.isArray(datos.combosDescartados) ? datos.combosDescartados : [];
       await precargarInfoProductos(pedidoTemp.map(p => p.id)); // necesario para recalcular combos al restaurar
       pedidoExistenteId = datos.pedidoExistenteId || null;
       checklistPreparacion = datos.checklistPreparacion || {};
@@ -2063,11 +2094,11 @@ async function buscarProductoEnLinea(texto) {
   if (!texto || texto.length < 2) { sug.style.display = "none"; return; }
 
   buscarLineaTimer = setTimeout(async () => {
-    const { data, error } = await sb
-      .from("promociones")
-      .select(PROMO_COLS)
-      .ilike("nombre", `%${texto}%`)
-      .limit(12);
+    // Sin límite de resultados: trae TODO lo que contenga el texto. Si se escriben
+    // varias palabras, el producto debe contener todas (en cualquier orden).
+    let q = sb.from("promociones").select(PROMO_COLS);
+    texto.trim().split(/\s+/).filter(Boolean).forEach(w => { q = q.ilike("nombre", `%${w}%`); });
+    const { data, error } = await q.order("nombre", { ascending: true });
     if (error || !data || data.length === 0) { sug.style.display = "none"; return; }
     registrarProductos(data);
 
@@ -2519,6 +2550,7 @@ async function consultarPedidosCliente() {
         // Cupo de promo que este pedido ya tenía reservado + info actual de los productos
         pedidoOrigCombo = mapaCombos(pedidoTemp);
         combosElegidos = Object.keys(pedidoOrigCombo);
+        combosDescartados = [];
         pedidoOrigPromo = {};
         pedidoTemp.forEach(l => {
           if (l.promo && /^\d+$/.test(String(l.id))) pedidoOrigPromo[l.id] = (pedidoOrigPromo[l.id] || 0) + (Number(l.cantidad) || 0);
@@ -2712,6 +2744,7 @@ function reiniciarPedido() {
     pedidoOrigPromo = {};
     pedidoOrigCombo = {};
     combosElegidos = [];
+    combosDescartados = [];
     pagosTemporales = [];
     pagosPreviosBD = [];
 
@@ -3134,11 +3167,43 @@ function descargarPDF(esPago = false, listaPagos = [], saldoPendienteReal = null
   const descMonto = subtotalPedido * (descPct / 100);
   const ajusteTotal = totalPedido - (subtotalPedido - descMonto); // redondeo manual del total final
   
+  // Detalle de promociones / combos / descuentos obtenidos y ahorro total
+  const filasAhorro = []; // [descripción, ahorro]
+  const combosAgrupados = {}; // combo_id -> { titulo, items:[], ahorro }
+  pedidoTemp.forEach(p => {
+    const cant = Number(p.cantidad) || 0;
+    const precio = Number(p.precio) || 0;
+    const info = productosPorId[p.id] || {};
+    const ref = Math.max(Number(info.precio) || 0, Number(p.precio_anterior) || 0, precio);
+    const ahorroLinea = Math.max(0, (ref - precio) * cant);
+    if (ahorroLinea < 0.005) return;
+    let ahorroCombo = 0;
+    if (p.combo_id) {
+      ahorroCombo = Math.min(ahorroLinea, Math.max(0, ((Number(p.precio_base) || 0) - precio) * cant));
+      const c = (window.combosActivos || []).find(x => String(x.id) === String(p.combo_id));
+      const g = combosAgrupados[p.combo_id] || (combosAgrupados[p.combo_id] = {
+        titulo: "COMBO: " + (c && c.nombre ? c.nombre : "Promo"), items: [], ahorro: 0 });
+      const benef = c ? comboBeneficioTxt(c) : "en promo";
+      g.items.push(`${p.nombre} x${p.combo_unid || 0} (${benef})`);
+      g.ahorro += ahorroCombo;
+    }
+    const resto = ahorroLinea - ahorroCombo;
+    if (resto >= 0.005) {
+      let motivo = "Oferta";
+      if (p.promo) motivo = "PROMO";
+      else if (p.caja) motivo = "Precio por caja cerrada";
+      else if (p.escala) motivo = `Precio por cantidad (desde ${p.escala} u.)`;
+      filasAhorro.push([`${motivo}: ${p.nombre} x${cant}`, resto]);
+    }
+  });
+  Object.values(combosAgrupados).forEach(g => {
+    filasAhorro.unshift([`${g.titulo}\n${g.items.join("\n")}`, g.ahorro]);
+  });
+  if (descPct > 0) filasAhorro.push([`Descuento adicional (${descPct}%)`, descMonto]);
+  ahorroTotal = filasAhorro.reduce((a, f) => a + f[1], 0);
+
   const productos = pedidoTemp.map(p => {
     const subtotal = p.precio * p.cantidad;
-    if (p.precio_anterior && p.precio_anterior > p.precio) {
-      ahorroTotal += (p.precio_anterior - p.precio) * p.cantidad;
-    }
     return [
       p.nombre,
       p.cantidad,
@@ -3199,8 +3264,24 @@ function descargarPDF(esPago = false, listaPagos = [], saldoPendienteReal = null
       styles: { fontSize: 9 }
     });
 
-    const finalY = doc.lastAutoTable.finalY || 100;
-    
+    let finalY = doc.lastAutoTable.finalY || 100;
+
+    // Promociones y combos obtenidos + ahorro
+    if (filasAhorro.length > 0) {
+      doc.autoTable({
+        startY: finalY + 8,
+        head: [["Promociones y combos obtenidos", "Ahorro"]],
+        body: filasAhorro.map(f => [f[0], `$${f[1].toFixed(2)}`]),
+        foot: [["AHORRO TOTAL", `$${ahorroTotal.toFixed(2)}`]],
+        showFoot: "lastPage",
+        headStyles: { fillColor: [39, 174, 96] },
+        footStyles: { fillColor: [220, 252, 231], textColor: [22, 101, 52], fontStyle: "bold" },
+        columnStyles: { 1: { halign: "right", cellWidth: 35 } },
+        styles: { fontSize: 9 }
+      });
+      finalY = doc.lastAutoTable.finalY;
+    }
+
     let yTot = finalY + 12;
     if (yTot + 35 > 280) { doc.addPage(); yTot = 20; }
 
@@ -3248,9 +3329,11 @@ function descargarPDF(esPago = false, listaPagos = [], saldoPendienteReal = null
     }
 
     if (ahorroTotal > 0) {
-      doc.setFontSize(11);
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
       doc.setTextColor(39, 174, 96);
-      doc.text(`Ahorro total: $${ahorroTotal.toFixed(2)}`, 14, yTot);
+      doc.text(`AHORRO TOTAL: $${ahorroTotal.toFixed(2)}`, 14, yTot);
+      doc.setTextColor(0);
     }
 
     doc.save(`Pedido_${nombreCliente.replace(/\s+/g, '_')}.pdf`);
