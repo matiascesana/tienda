@@ -1007,7 +1007,8 @@ function precioHTMLCard(p) {
 // ==================== COMBOS / PROMOS POR VOLUMEN (misma lógica que el panel) ====================
 // El combo NO es un producto: es una regla. Los productos siguen con su único stock.
 //   REQUISITOS : condiciones que se cumplen TODAS a la vez ("N de una categoría" o "N de un producto").
-//   REGALOS    : uno o más productos; se ELIGE entre ellos (ej: oxidante 10, 20, 30 o 40 vol).
+//   REGALOS    : uno o más productos; según modo_regalos se ELIGE entre ellos (ej: oxidante 10, 20, 30 o 40 vol)
+//                o se bonifican TODOS, uno de cada uno (ej: tratamiento + crema de peinar).
 //   BENEFICIO  : sin cargo (100%), % de descuento o precio especial por unidad.
 //   REPETIR    : un beneficio por cada grupo completo (24 tinturas = 2 regalos).
 // El vendedor/cliente ELIGE qué promo usar (combosElegidos). Las promos que piden lo mismo
@@ -1069,6 +1070,13 @@ function comboRegalos(c) {
   const r = comboJson(c.regalos);
   if (Array.isArray(r) && r.length) return r;
   return c.regalo_producto_id ? [{ id: c.regalo_producto_id, nombre: c.regalo_nombre || '' }] : [];
+}
+
+// Modo de bonificación de los productos cargados (se define al crear el combo en el panel):
+//  'elegir' (por defecto): el cliente elige entre ellos; total de unidades = unidades por beneficio x grupos completos.
+//  'todos': se bonifican TODOS los productos cargados, "uno de cada uno" (x grupos completos).
+function comboModoTodos(c) {
+  return !!c && c.modo_regalos === 'todos' && comboRegalos(c).length > 1;
 }
 
 function comboEsPrecioEspecial(c) {
@@ -1177,15 +1185,21 @@ function aplicarCombos(lineas, origCombos) {
     const ganados = veces * (parseInt(c.regalo_cantidad, 10) || 1);
     const restante = combosRestante(c, origCombos);
 
-    // Repartir las unidades ganadas entre los productos elegidos (en orden del carrito)
+    // Reparto de la bonificación en las líneas del carrito (en orden del carrito)
+    //  - modo 'elegir': las unidades ganadas se reparten libremente entre los productos elegidos por el cliente.
+    //  - modo 'todos': cada producto cargado se bonifica hasta "porProd" unidades (uno de cada uno x grupos completos).
+    const todos = comboModoTodos(c);
+    const porProd = veces * (parseInt(c.regalo_cantidad, 10) || 1);
     let pendiente = Math.min(ganados, restante);
+    let cupoRest = restante;
     let aplicados = 0;
     const detalle = [];
     lineas.forEach(l => {
-      if (pendiente <= 0) return;
       if (!giftIds.has(String(l.id)) || l.combo_id || l.precioManual) return;
       const cant = Number(l.cantidad) || 0;
-      const ap = Math.min(pendiente, cant);
+      const tope = todos ? Math.min(porProd, cupoRest) : pendiente;
+      if (tope <= 0) return;
+      const ap = Math.min(tope, cant);
       if (ap <= 0) return;
       const base = Number(l.precio) || 0;
       const unit = comboPrecioUnitBenef(c, base);
@@ -1197,13 +1211,29 @@ function aplicarCombos(lineas, origCombos) {
       l.precio_anterior = base;
       l.combo_id = c.id;
       l.combo_unid = ap;
-      pendiente -= ap;
+      if (todos) cupoRest -= ap; else pendiente -= ap;
       aplicados += ap;
-      detalle.push({ nombre: l.nombre, unidades: ap });
+      detalle.push({ id: l.id, nombre: l.nombre, unidades: ap });
     });
 
-    estado.push({ combo: c, progreso, regalos, detalle, ganados, aplicados, restante,
-                  falta: Math.max(0, Math.min(ganados, restante) - aplicados) });
+    // Qué falta agregar al pedido para completar el beneficio
+    let faltantes = [];
+    let falta;
+    let ganadosTot = ganados;
+    if (todos) {
+      ganadosTot = porProd * regalos.length;
+      let cr = cupoRest;
+      regalos.forEach(r => {
+        const ya = (detalle.find(x => String(x.id) === String(r.id)) || { unidades: 0 }).unidades;
+        const f = Math.max(0, Math.min(porProd - ya, cr));
+        if (f > 0) { faltantes.push({ id: r.id, nombre: r.nombre, falta: f }); cr -= f; }
+      });
+      falta = faltantes.reduce((s, x) => s + x.falta, 0);
+    } else {
+      falta = Math.max(0, Math.min(ganados, restante) - aplicados);
+    }
+
+    estado.push({ combo: c, progreso, regalos, detalle, ganados: ganadosTot, aplicados, restante, todos, faltantes, falta });
   });
   return { cambio: antes !== sig(), estado, disponibles };
 }
@@ -1283,9 +1313,18 @@ function bannerCombosHTML(res) {
     e.detalle.forEach(d => bloque.push(`<div style="color:#166534;">🎁 <b>${escCombo(d.nombre)}</b> ×${d.unidades} ${benef} · quedan ${quedan} en promo</div>`));
     if (e.ganados > e.restante) bloque.push(`<div style="color:#c0392b;">Cupo limitado: solo quedan ${e.restante} en promo</div>`);
     if (e.falta > 0) {
-      const btns = e.regalos.map(r =>
-        `<button type="button" onclick="agregarRegaloCombo(${c.id}, '${escCombo(r.id)}')" style="margin:2px 4px 2px 0;padding:3px 10px;border:none;border-radius:6px;background:#f39c12;color:#fff;font-weight:bold;cursor:pointer;">+ ${escCombo(r.nombre)}</button>`).join('');
-      bloque.push(`<div style="color:#92400e;">🎁 Ganó ${e.falta} × ${benef}. ${multi ? 'Elegí cuál agregar:' : 'Agregalo:'} ${btns}</div>`);
+      const BTN = 'margin:2px 4px 2px 0;padding:3px 10px;border:none;border-radius:6px;background:#f39c12;color:#fff;font-weight:bold;cursor:pointer;';
+      if (e.todos) {
+        // Se bonifican todos: un botón por cada producto que todavía falta agregar (cada toque suma 1 unidad)
+        const btns = e.faltantes.map(f =>
+          `<button type="button" onclick="agregarRegaloCombo(${c.id}, '${escCombo(f.id)}')" style="${BTN}">+ ${escCombo(f.nombre)}${f.falta > 1 ? ' (faltan ' + f.falta + ')' : ''}</button>`).join('');
+        const lista = e.faltantes.map(f => `${f.falta} × <b>${escCombo(f.nombre)}</b>`).join(' + ');
+        bloque.push(`<div style="color:#92400e;">🎁 Ganó ${lista} ${benef}. Agregalos: ${btns}</div>`);
+      } else {
+        const btns = e.regalos.map(r =>
+          `<button type="button" onclick="agregarRegaloCombo(${c.id}, '${escCombo(r.id)}')" style="${BTN}">+ ${escCombo(r.nombre)}</button>`).join('');
+        bloque.push(`<div style="color:#92400e;">🎁 Ganó ${e.falta} × ${benef}. ${multi ? 'Elegí cuál agregar:' : 'Agregalo:'} ${btns}</div>`);
+      }
     }
     partes.push(`<div style="margin-bottom:8px;">${bloque.join('')}</div>`);
   });
@@ -1294,7 +1333,9 @@ function bannerCombosHTML(res) {
     const c = d.combo;
     const cant = parseInt(c.regalo_cantidad, 10) || 1;
     const reqTxt = d.progreso.map(p => `<b>${p.req}</b> × ${escCombo(p.nombre)}`).join(' + ');
-    const queTxt = d.regalos.length > 1
+    const queTxt = comboModoTodos(c)
+      ? `<b>${cant}</b> de cada uno: <b>${d.regalos.map(r => escCombo(r.nombre)).join(' + ')}</b>`
+      : d.regalos.length > 1
       ? `<b>${cant}</b> a elección entre <b>${d.regalos.map(r => escCombo(r.nombre)).join(' / ')}</b>`
       : `<b>${cant} × ${escCombo((d.regalos[0] || {}).nombre || '')}</b>`;
     const progTxt = d.progreso.map(p => `${escCombo(p.nombre)}: ${p.tiene}/${p.req}`).join(' · ');
